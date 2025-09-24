@@ -47,3 +47,21 @@ def get_meta(media_type, tmdb_id):
     except requests.exceptions.RequestException as e:
         print(f"请求 TMDB 元数据时发生错误: {e}")
         return None
+
+def get_season_episodes(tv_id, season_number):
+    """
+    获取单个季度的所有分集信息。
+
+    :param tv_id: 剧集的 TMDB ID
+    :param season_number: 季号
+    :return: 包含分集信息的列表, 如果出错则返回空列表
+    """
+    url = f"{BASE_URL}/tv/{tv_id}/season/{season_number}?api_key={TMDB_API_KEY}&language=zh-CN"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("episodes", [])
+    except requests.exceptions.RequestException as e:
+        print(f"请求 TMDB 季度 {season_number} 信息时发生错误: {e}")
+        return []

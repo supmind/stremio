@@ -1,5 +1,5 @@
 from fastapi.responses import JSONResponse
-from tmdb import get_popular as tmdb_get_popular, get_meta as tmdb_get_meta
+from tmdb import get_popular as tmdb_get_popular, get_meta as tmdb_get_meta, get_season_episodes
 from config import PLUGIN_ID, PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DESCRIPTION
 
 def get_manifest():
@@ -15,7 +15,6 @@ def get_manifest():
         "resources": [
             "catalog",
             "meta",
-            # "stream" 资源已被移除
         ],
         "types": ["movie", "series"],
         "idPrefixes": ["tmdb:"],
@@ -36,7 +35,6 @@ def get_manifest():
 def _to_stremio_meta_preview(item, media_type):
     """
     将 TMDB API 返回的条目转换为 Stremio 的 meta 预览格式。
-    这个格式用于在 catalog 中显示。
     """
     return {
         "id": f"tmdb:{item.get('id')}",
@@ -48,25 +46,36 @@ def _to_stremio_meta_preview(item, media_type):
 def get_catalog(media_type, catalog_id):
     """
     处理 Stremio 的 catalog 请求。
-    根据 catalog_id 从 TMDB 获取热门电影或剧集, 并转换为 Stremio 格式。
     """
     if catalog_id not in ["tmdb-popular-movies", "tmdb-popular-series"]:
         return JSONResponse(content={"metas": []})
 
-    # Stremio 使用 'series' 类型, TMDB 使用 'tv'
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
-
     popular_items = tmdb_get_popular(tmdb_type)
-
-    # 将 TMDB 的数据转换为 Stremio 的 meta 预览列表
     metas = [_to_stremio_meta_preview(item, media_type) for item in popular_items]
-
     return JSONResponse(content={"metas": metas})
+
+def _to_stremio_videos(episodes, series_id):
+    """
+    将 TMDB 的分集信息转换为 Stremio 的 video 对象格式。
+    """
+    videos = []
+    for episode in episodes:
+        video_id = f"tmdb:{series_id}:{episode.get('season_number')}:{episode.get('episode_number')}"
+        videos.append({
+            "id": video_id,
+            "title": episode.get('name'),
+            "season": episode.get('season_number'),
+            "episode": episode.get('episode_number'),
+            "released": episode.get('air_date'),
+            "overview": episode.get('overview'),
+            "thumbnail": f"https://image.tmdb.org/t/p/w500{episode.get('still_path')}" if episode.get('still_path') else None,
+        })
+    return videos
 
 def _to_stremio_meta(item, media_type):
     """
     将 TMDB API 返回的详细信息转换为 Stremio 的 meta 对象格式。
-    这个格式用于显示电影或剧集的详情页面。
     """
     meta = {
         "id": f"tmdb:{item.get('id')}",
@@ -76,7 +85,6 @@ def _to_stremio_meta(item, media_type):
         "background": f"https://image.tmdb.org/t/p/original{item.get('backdrop_path')}" if item.get('backdrop_path') else None,
         "description": item.get('overview'),
         "releaseInfo": item.get('release_date') if media_type == 'movie' else item.get('first_air_date'),
-        # 可以根据需要添加更多字段, 例如评分、类型等
         "imdbRating": item.get('vote_average'),
         "genres": [genre['name'] for genre in item.get('genres', [])],
     }
@@ -84,18 +92,27 @@ def _to_stremio_meta(item, media_type):
 
 def get_meta(media_type, tmdb_id_str):
     """
-    处理 Stremio 的 meta 请求。
-    根据 tmdb_id 从 TMDB 获取单个电影或剧集的详细信息。
+    处理 Stremio 的 meta 请求, 返回单个电影或剧集的详细信息。
+    如果请求的是剧集, 则额外获取并返回分集信息。
     """
-    # Stremio 的 ID 格式为 "tmdb:12345", 我们需要提取出数字 ID
     tmdb_id = tmdb_id_str.replace("tmdb:", "")
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
 
     meta_info = tmdb_get_meta(tmdb_type, tmdb_id)
-
     if not meta_info:
         return JSONResponse(content={"meta": {}})
 
     stremio_meta = _to_stremio_meta(meta_info, media_type)
+
+    # 如果是剧集, 则获取所有分集信息
+    if media_type == 'series':
+        all_episodes = []
+        # TMDB API 可能会有 "special" 季节, 季号为 0, 通常我们不显示
+        seasons = [s for s in meta_info.get('seasons', []) if s.get('season_number') != 0]
+        for season in seasons:
+            episodes = get_season_episodes(tmdb_id, season.get('season_number'))
+            all_episodes.extend(episodes)
+
+        stremio_meta['videos'] = _to_stremio_videos(all_episodes, tmdb_id)
 
     return JSONResponse(content={"meta": stremio_meta})
