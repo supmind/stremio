@@ -6,7 +6,6 @@ from typing import Optional
 app = FastAPI()
 
 # 配置 CORS 中间件
-# 允许所有来源、所有方法、所有请求头, 这是 Stremio 插件的推荐配置
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,17 +22,27 @@ def root():
 async def read_manifest():
     return await get_manifest()
 
-@app.get("/catalog/{media_type}/{catalog_id}/{extra_props:path}.json")
-async def read_catalog(media_type: str, catalog_id: str, extra_props: Optional[str] = None):
+# 修正: 为 catalog 提供两个端点, 以正确处理带和不带 extra_props 的情况
+
+@app.get("/catalog/{media_type}/{catalog_id}.json")
+async def read_catalog_root(media_type: str, catalog_id: str):
     """
-    处理所有 catalog 请求, 包括带或不带额外参数的情况。
+    处理不带额外参数的 catalog 请求 (例如首页)。
+    """
+    return get_catalog(media_type, catalog_id)
+
+@app.get("/catalog/{media_type}/{catalog_id}/{extra_props}.json")
+async def read_catalog_with_extras(media_type: str, catalog_id: str, extra_props: str):
+    """
+    处理带有额外参数 (类型筛选、排序、分页) 的 catalog 请求。
     """
     extra_args = {}
     if extra_props:
         try:
+            # Stremio 的 extra_props 格式是 "key=value&key2=value2"
             extra_args = dict(prop.split("=") for prop in extra_props.split("&"))
         except ValueError:
-            pass
+            pass # 如果解析失败, extra_args 保持为空
 
     return get_catalog(media_type, catalog_id, extra_args)
 
