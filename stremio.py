@@ -10,11 +10,7 @@ SORT_OPTIONS = ["热门", "发行日期", "评分"]
 YEARS = [str(year) for year in range(datetime.now().year, 1979, -1)]
 
 def format_to_iso(date_str):
-    """
-    将 YYYY-MM-DD 格式的日期字符串转换为 Stremio 兼容的 ISO 8601 格式。
-    """
-    if not date_str:
-        return None
+    if not date_str: return None
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
         dt_utc = dt.replace(tzinfo=timezone.utc)
@@ -25,15 +21,17 @@ def format_to_iso(date_str):
 async def get_manifest():
     """
     提供插件的 manifest.json。
-    - 首页(catalogs): 显示热门、高分、最新的电影和剧集。
-    - 发现页(filterCatalogs): 提供统一的筛选入口。
+    - 首页包含6个目录, 每个目录都支持筛选、排序和分页。
     """
     if "movie_genres" not in GENRE_CACHE: GENRE_CACHE["movie_genres"] = get_genres("movie")
     if "series_genres" not in GENRE_CACHE: GENRE_CACHE["series_genres"] = get_genres("tv")
+
     movie_genres = [genre['name'] for genre in GENRE_CACHE["movie_genres"]]
     series_genres = [genre['name'] for genre in GENRE_CACHE["series_genres"]]
 
-    # 定义首页目录
+    movie_extra = [{"name": "genre", "options": movie_genres}, {"name": "sort", "options": SORT_OPTIONS}, {"name": "year", "options": YEARS}]
+    series_extra = [{"name": "genre", "options": series_genres}, {"name": "sort", "options": SORT_OPTIONS}, {"name": "year", "options": YEARS}]
+
     home_catalogs = []
     base_home_sorts = [
         {"id": "popular", "name": "热门"},
@@ -41,22 +39,15 @@ async def get_manifest():
         {"id": "latest", "name": "最新"},
     ]
     for cat in base_home_sorts:
-        home_catalogs.append({"type": "movie", "id": f"tmdb-movies-{cat['id']}", "name": f"{cat['name']}电影"})
+        home_catalogs.append({"type": "movie", "id": f"tmdb-movies-{cat['id']}", "name": f"{cat['name']}电影", "extra": movie_extra, "behaviorHints": {"paginated": True}})
     for cat in base_home_sorts:
-        home_catalogs.append({"type": "series", "id": f"tmdb-series-{cat['id']}", "name": f"{cat['name']}剧集"})
-
-    # 定义发现页目录
-    discover_extra_movie = [{"name": "sort", "options": SORT_OPTIONS}, {"name": "genre", "options": movie_genres}, {"name": "year", "options": YEARS}]
-    discover_extra_series = [{"name": "sort", "options": SORT_OPTIONS}, {"name": "genre", "options": series_genres}, {"name": "year", "options": YEARS}]
+        home_catalogs.append({"type": "series", "id": f"tmdb-series-{cat['id']}", "name": f"{cat['name']}剧集", "extra": series_extra, "behaviorHints": {"paginated": True}})
 
     return {
         "id": PLUGIN_ID, "version": PLUGIN_VERSION, "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
         "resources": ["catalog", "meta"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
         "catalogs": home_catalogs,
-        "filterCatalogs": [
-            {"type": "movie", "id": "tmdb-movies-discover", "name": "发现电影", "extra": discover_extra_movie, "behaviorHints": {"paginated": True}},
-            {"type": "series", "id": "tmdb-series-discover", "name": "发现剧集", "extra": discover_extra_series, "behaviorHints": {"paginated": True}}
-        ]
+        # 移除 filterCatalogs
     }
 
 def _to_stremio_meta_preview(item, media_type):
@@ -71,16 +62,12 @@ def get_catalog(media_type, catalog_id, extra_args=None):
     extra_args = extra_args or {}
     skip = int(extra_args.get("skip", 0))
     page = (skip // 20) + 1
-    sort_by = "热门"
 
-    # 发现页的请求, 排序方式由用户选择
-    if "discover" in catalog_id:
-        sort_by = extra_args.get("sort", "热门")
-    # 首页的请求, 排序方式由 catalog_id 决定
-    else:
-        sort_key = catalog_id.split("-")[-1]
-        sort_map = {"popular": "热门", "rating": "评分", "latest": "发行日期"}
-        if sort_key in sort_map: sort_by = sort_map[sort_key]
+    # 从 catalog_id 中解析出默认排序方式
+    sort_key = catalog_id.split("-")[-1]
+    sort_map = {"popular": "热门", "rating": "评分", "latest": "发行日期"}
+    # 用户在"查看全部"页面选择的排序方式, 会覆盖默认值
+    sort_by = extra_args.get("sort", sort_map.get(sort_key, "热门"))
 
     genre_name = extra_args.get("genre")
     year = extra_args.get("year")
