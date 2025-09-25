@@ -3,6 +3,7 @@ from tmdb import get_meta as tmdb_get_meta, get_season_episodes, get_genres, dis
 from config import PLUGIN_ID, PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DESCRIPTION
 import asyncio
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 # 缓存和常量
 GENRE_CACHE = {}
@@ -123,7 +124,7 @@ def _to_stremio_meta(item, media_type):
         {
             "name": genre['name'],
             "category": "genre",
-            "url": f"stremio:///discover/{media_type}/tmdb-discover-all?类型={genre['name']}"
+            "url": f"stremio:///discover/{media_type}/tmdb-discover-all?类型={quote(genre['name'])}"
         } for genre in genres
     ]
 
