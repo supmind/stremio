@@ -21,7 +21,7 @@ def format_to_iso(date_str):
 async def get_manifest():
     """
     提供插件的 manifest.json。
-    - 将 "genre" 标签本地化为 "类型"。
+    实验: 移除"热门电影"的 extra 属性, 只保留分页, 以测试兼容性。
     """
     if "movie_genres" not in GENRE_CACHE: GENRE_CACHE["movie_genres"] = get_genres("movie")
     if "series_genres" not in GENRE_CACHE: GENRE_CACHE["series_genres"] = get_genres("tv")
@@ -32,19 +32,19 @@ async def get_manifest():
     movie_extra = [{"name": "类型", "options": movie_genres}, {"name": "排序", "options": SORT_OPTIONS}, {"name": "年份", "options": YEARS}]
     series_extra = [{"name": "类型", "options": series_genres}, {"name": "排序", "options": SORT_OPTIONS}, {"name": "年份", "options": YEARS}]
 
-    home_catalogs = []
-    base_home_sorts = [
-        {"id": "popular", "name": "热门"},
-        {"id": "rating", "name": "高分"},
-        {"id": "latest", "name": "最新"},
+    home_catalogs = [
+        # 实验: "热门电影"目录不带 extra
+        {"type": "movie", "id": "tmdb-movies-popular", "name": "热门电影 (测试)", "behaviorHints": {"paginated": True}},
+        {"type": "movie", "id": "tmdb-movies-rating", "name": "高分电影", "extra": movie_extra, "behaviorHints": {"paginated": True}},
+        {"type": "movie", "id": "tmdb-movies-latest", "name": "最新电影", "extra": movie_extra, "behaviorHints": {"paginated": True}},
+        {"type": "series", "id": "tmdb-series-popular", "name": "热门剧集", "extra": series_extra, "behaviorHints": {"paginated": True}},
+        {"type": "series", "id": "tmdb-series-rating", "name": "高分剧集", "extra": series_extra, "behaviorHints": {"paginated": True}},
+        {"type": "series", "id": "tmdb-series-latest", "name": "最新剧集", "extra": series_extra, "behaviorHints": {"paginated": True}},
     ]
-    for cat in base_home_sorts:
-        home_catalogs.append({"type": "movie", "id": f"tmdb-movies-{cat['id']}", "name": f"{cat['name']}电影", "extra": movie_extra, "behaviorHints": {"paginated": True}})
-    for cat in base_home_sorts:
-        home_catalogs.append({"type": "series", "id": f"tmdb-series-{cat['id']}", "name": f"{cat['name']}剧集", "extra": series_extra, "behaviorHints": {"paginated": True}})
 
     return {
-        "id": PLUGIN_ID, "version": PLUGIN_VERSION, "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
+        "id": PLUGIN_ID, "version": "1.0.2", # 提升版本号以强制刷新
+        "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
         "resources": ["catalog", "meta"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
         "catalogs": home_catalogs,
     }
