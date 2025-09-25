@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from stremio import get_manifest, get_catalog, get_meta
+from typing import Optional
 
 app = FastAPI()
 
@@ -21,26 +22,21 @@ def root():
 async def read_manifest():
     return await get_manifest()
 
-# 最终修复: 为 catalog 提供两个明确的端点, 这是最稳健的方案
-
-@app.get("/catalog/{media_type}/{catalog_id}.json")
-async def read_catalog_root(media_type: str, catalog_id: str):
+# 最终修复: 使用单个端点和可选路径参数来处理所有 catalog 请求
+@app.get("/catalog/{media_type}/{catalog_id}/{extra_props:path}.json")
+async def read_catalog(media_type: str, catalog_id: str, extra_props: Optional[str] = None):
     """
-    处理不带额外参数的 catalog 请求 (例如首页的六个目录)。
-    """
-    return get_catalog(media_type, catalog_id)
-
-@app.get("/catalog/{media_type}/{catalog_id}/{extra_props}.json")
-async def read_catalog_with_extras(media_type: str, catalog_id: str, extra_props: str):
-    """
-    处理带有额外参数 (类型筛选、排序、分页) 的 catalog 请求 (来自发现页)。
+    处理所有 catalog 请求。
+    extra_props 是一个可选路径参数, 格式为 "key=value&key2=value2"
     """
     extra_args = {}
     if extra_props:
         try:
-            extra_args = dict(prop.split("=") for prop in extra_props.split("&"))
+            # Stremio 的 extra_props 格式是 "key=value&key2=value2"
+            # FastAPI 会自动 URL 解码, 我们只需解析参数
+            extra_args = dict(prop.split("=") for prop in extra_props.replace(".json", "").split("&"))
         except ValueError:
-            pass
+            pass # 如果解析失败, extra_args 保持为空
 
     return get_catalog(media_type, catalog_id, extra_args)
 

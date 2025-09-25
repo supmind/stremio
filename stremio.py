@@ -21,7 +21,7 @@ def format_to_iso(date_str):
 async def get_manifest():
     """
     提供插件的 manifest.json。
-    最终修复: 在 extra 中明确声明 skip 参数。
+    最终方案: 回归到最稳定、最简单的目录结构, 以确保所有功能正常工作。
     """
     if "movie_genres" not in GENRE_CACHE: GENRE_CACHE["movie_genres"] = get_genres("movie")
     if "series_genres" not in GENRE_CACHE: GENRE_CACHE["series_genres"] = get_genres("tv")
@@ -43,7 +43,7 @@ async def get_manifest():
     ]
 
     return {
-        "id": PLUGIN_ID, "version": "1.0.5", # 提升版本号
+        "id": PLUGIN_ID, "version": "1.0.7", # 提升版本号
         "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
         "resources": ["catalog", "meta"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
         "catalogs": [
@@ -65,7 +65,8 @@ def get_catalog(media_type, catalog_id, extra_args=None):
     skip = int(extra_args.get("skip", 0))
     page = (skip // 20) + 1
 
-    sort_by = extra_args.get("排序", "热门")
+    # 简化后的逻辑: 所有信息都来自 extra_args
+    sort_by = extra_args.get("排序", "热门") # 默认值为"热门"
     genre_name = extra_args.get("类型")
     year = extra_args.get("年份")
     genre_id = None
