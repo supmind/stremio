@@ -4,8 +4,17 @@ from dotenv import load_dotenv
 # 加载 .env 文件中的环境变量
 load_dotenv()
 
-# 从环境变量中获取 TMDB API 读访问令牌
+# TMDB API 读访问令牌
 TMDB_ACCESS_TOKEN = os.getenv("TMDB_ACCESS_TOKEN")
+
+# [可选] 代理配置
+http_proxy = os.getenv("HTTP_PROXY")
+https_proxy = os.getenv("HTTPS_PROXY")
+PROXIES = {}
+if http_proxy:
+    PROXIES["http"] = http_proxy
+if https_proxy:
+    PROXIES["https"] = https_proxy
 
 # Stremio 插件配置
 PLUGIN_ID = "com.example.stremio-tmdb-plugin"

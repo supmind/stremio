@@ -1,5 +1,5 @@
 import requests
-from config import TMDB_ACCESS_TOKEN
+from config import TMDB_ACCESS_TOKEN, PROXIES
 
 # TMDB API 的基础 URL 和通用请求头
 BASE_URL = "https://api.themoviedb.org/3"
@@ -16,7 +16,7 @@ def get_meta(media_type, tmdb_id):
         return None
     url = f"{BASE_URL}/{media_type}/{tmdb_id}?language=zh-CN"
     try:
-        response = requests.get(url, headers=HEADERS)
+        response = requests.get(url, headers=HEADERS, proxies=PROXIES)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
@@ -29,7 +29,7 @@ def get_season_episodes(tv_id, season_number):
     """
     url = f"{BASE_URL}/tv/{tv_id}/season/{season_number}?language=zh-CN"
     try:
-        response = requests.get(url, headers=HEADERS)
+        response = requests.get(url, headers=HEADERS, proxies=PROXIES)
         response.raise_for_status()
         data = response.json()
         return data.get("episodes", [])
@@ -43,7 +43,7 @@ def get_genres(media_type="movie"):
     """
     url = f"{BASE_URL}/genre/{media_type}/list?language=zh-CN"
     try:
-        response = requests.get(url, headers=HEADERS)
+        response = requests.get(url, headers=HEADERS, proxies=PROXIES)
         response.raise_for_status()
         data = response.json()
         return [genre for genre in data.get("genres", []) if genre['name'] != "成人"]
@@ -60,7 +60,7 @@ def discover_media(media_type="movie", genre_id=None, sort_by=None, year=None, p
         "发行日期": "primary_release_date.desc",
         "评分": "vote_average.desc",
     }
-    sort_param = sort_map.get(sort_by, "popularity.desc")
+    sort_param = sort_map.get(sort_by, "热门")
 
     params = {
         'language': 'zh-CN',
@@ -80,7 +80,7 @@ def discover_media(media_type="movie", genre_id=None, sort_by=None, year=None, p
 
     url = f"{BASE_URL}/discover/{media_type}"
     try:
-        response = requests.get(url, headers=HEADERS, params=params)
+        response = requests.get(url, headers=HEADERS, params=params, proxies=PROXIES)
         response.raise_for_status()
         data = response.json()
         return data.get("results", [])

@@ -20,9 +20,14 @@
 ```
 # .env
 TMDB_ACCESS_TOKEN="your_tmdb_bearer_token_here"
+
+# [可选] 代理服务器配置
+# 如果你的服务器需要通过代理访问外网, 请取消注释并设置以下变量
+# HTTP_PROXY="http://user:pass@host:port"
+# HTTPS_PROXY="https://user:pass@host:port"
 ```
 
-你可以从 [TMDB 网站](https://www.themoviedb.org/settings/api) 的“API 读访问令牌”部分获取。
+你可以从 [TMDB 网站](https://www.themoviedb.org/settings/api) 的“API 读访问令牌”部分获取 `TMDB_ACCESS_TOKEN`。
 
 ### 3. 安装依赖
 
