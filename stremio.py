@@ -29,13 +29,13 @@ async def get_manifest():
     # 为可发现目录（可过滤）添加 'skip'
     movie_extra_discover = [
         {"name": "排序", "options": ["热门", "评分", "发行日期"], "isRequired": False},
-        {"name": "类型", "options": movie_genres, "isRequired": False},
+        {"name": "genre", "options": movie_genres, "isRequired": False},
         {"name": "年份", "options": YEARS, "isRequired": False},
         {"name": "skip"} # 添加 skip
     ]
     series_extra_discover = [
         {"name": "排序", "options": ["热门", "评分", "发行日期"], "isRequired": False},
-        {"name": "类型", "options": series_genres, "isRequired": False},
+        {"name": "genre", "options": series_genres, "isRequired": False},
         {"name": "年份", "options": YEARS, "isRequired": False},
         {"name": "skip"} # 添加 skip
     ]
@@ -125,9 +125,9 @@ def _to_stremio_meta(request, item, media_type):
     genres = item.get('genres', [])
     genre_links = [
         {
-            "name": "类别",
-            "category": "Genre",
-            "url": f"stremio:///discover/{transport_url}/{media_type}/tmdb-discover-all?类型={genre['name']}"
+            "name": genre['name'],
+            "category": "Discover by Genre",
+            "url": f"stremio:///discover/{quote(transport_url)}/{media_type}/tmdb-discover-all?genre={quote(genre['name'])}"
         } for genre in genres
     ]
 
