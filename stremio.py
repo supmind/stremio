@@ -118,6 +118,15 @@ def _to_stremio_videos(episodes, series_id):
     return videos
 
 def _to_stremio_meta(item, media_type):
+    genres = item.get('genres', [])
+    genre_links = [
+        {
+            "name": genre['name'],
+            "category": "genre",
+            "url": f"stremio:///discover/{media_type}/tmdb-discover-all?类型={genre['name']}"
+        } for genre in genres
+    ]
+
     meta = {
         "id": f"tmdb:{item.get('id')}",
         "type": media_type,
@@ -127,7 +136,8 @@ def _to_stremio_meta(item, media_type):
         "description": item.get('overview'),
         "releaseInfo": format_to_iso(item.get('release_date') if media_type == 'movie' else item.get('first_air_date')),
         "imdbRating": item.get('vote_average'),
-        "genres": [genre['name'] for genre in item.get('genres', [])],
+        "genres": [genre['name'] for genre in genres],
+        "links": genre_links,
         "videos": [],  # Crucial: Add 'videos' array for all types
         "behaviorHints": {
             "defaultVideoId": None,
