@@ -1,8 +1,19 @@
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from stremio import get_manifest, get_catalog, get_meta
 from typing import Optional
 
 app = FastAPI()
+
+# 配置 CORS 中间件
+# 允许所有来源、所有方法、所有请求头, 这是 Stremio 插件的推荐配置
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def root():
@@ -16,15 +27,12 @@ async def read_manifest():
 async def read_catalog(media_type: str, catalog_id: str, extra_props: Optional[str] = None):
     """
     处理所有 catalog 请求, 包括带或不带额外参数的情况。
-    - extra_props: 可选路径参数, 格式为 "key1=value1&key2=value2"
     """
     extra_args = {}
     if extra_props:
-        # FastAPI 会自动解码 URL, 但我们需要手动解析参数
         try:
             extra_args = dict(prop.split("=") for prop in extra_props.split("&"))
         except ValueError:
-            # 如果解析失败, 忽略 extra_props
             pass
 
     return get_catalog(media_type, catalog_id, extra_args)
