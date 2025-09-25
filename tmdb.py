@@ -4,24 +4,6 @@ from config import TMDB_API_KEY
 # TMDB API 的基础 URL
 BASE_URL = "https://api.themoviedb.org/3"
 
-def get_popular(media_type="movie", page=1):
-    """
-    从 TMDB API 获取热门电影或剧集, 支持分页, 排除成人内容。
-    """
-    if media_type not in ["movie", "tv"]:
-        return []
-
-    url = f"{BASE_URL}/{media_type}/popular?api_key={TMDB_API_KEY}&language=zh-CN&page={page}&include_adult=false"
-
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        return data.get("results", [])
-    except requests.exceptions.RequestException as e:
-        print(f"请求 TMDB API 时发生错误: {e}")
-        return []
-
 def get_meta(media_type, tmdb_id):
     """
     从 TMDB API 获取单个电影或剧集的详细元数据。

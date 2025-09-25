@@ -1,5 +1,5 @@
 from fastapi.responses import JSONResponse
-from tmdb import get_popular, get_meta, get_season_episodes, get_genres, discover_media
+from tmdb import get_meta, get_season_episodes, get_genres, discover_media
 from config import PLUGIN_ID, PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DESCRIPTION
 import asyncio
 from datetime import datetime
@@ -12,7 +12,8 @@ YEARS = [str(year) for year in range(datetime.now().year, 1979, -1)]
 async def get_manifest():
     """
     提供插件的 manifest.json。
-    - 增加年份筛选和分页加载功能。
+    - 首页(catalogs): 只显示最新电影和剧集。
+    - 发现页(filterCatalogs): 提供丰富的筛选和排序功能。
     """
     if "movie_genres" not in GENRE_CACHE:
         GENRE_CACHE["movie_genres"] = get_genres("movie")
@@ -22,55 +23,19 @@ async def get_manifest():
     movie_genres = [genre['name'] for genre in GENRE_CACHE["movie_genres"]]
     series_genres = [genre['name'] for genre in GENRE_CACHE["series_genres"]]
 
-    # 定义通用的额外参数
-    movie_extra = [
-        {"name": "genre", "options": movie_genres},
-        {"name": "sort", "options": SORT_OPTIONS},
-        {"name": "year", "options": YEARS}
-    ]
-    series_extra = [
-        {"name": "genre", "options": series_genres},
-        {"name": "sort", "options": SORT_OPTIONS},
-        {"name": "year", "options": YEARS}
-    ]
+    movie_extra = [{"name": "genre", "options": movie_genres}, {"name": "sort", "options": SORT_OPTIONS}, {"name": "year", "options": YEARS}]
+    series_extra = [{"name": "genre", "options": series_genres}, {"name": "sort", "options": SORT_OPTIONS}, {"name": "year", "options": YEARS}]
 
     return {
-        "id": PLUGIN_ID,
-        "version": PLUGIN_VERSION,
-        "name": PLUGIN_NAME,
-        "description": PLUGIN_DESCRIPTION,
-        "resources": ["catalog", "meta"],
-        "types": ["movie", "series"],
-        "idPrefixes": ["tmdb:"],
+        "id": PLUGIN_ID, "version": PLUGIN_VERSION, "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
+        "resources": ["catalog", "meta"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
         "catalogs": [
-            {
-                "type": "movie",
-                "id": "tmdb-movies-popular",
-                "name": "热门电影",
-                "behaviorHints": {"paginated": True}
-            },
-            {
-                "type": "series",
-                "id": "tmdb-series-popular",
-                "name": "热门剧集",
-                "behaviorHints": {"paginated": True}
-            }
+            {"type": "movie", "id": "tmdb-movies-latest", "name": "最新电影", "behaviorHints": {"paginated": True}},
+            {"type": "series", "id": "tmdb-series-latest", "name": "最新剧集", "behaviorHints": {"paginated": True}}
         ],
         "filterCatalogs": [
-            {
-                "type": "movie",
-                "id": "tmdb-movies-discover",
-                "name": "发现电影",
-                "extra": movie_extra,
-                "behaviorHints": {"paginated": True}
-            },
-            {
-                "type": "series",
-                "id": "tmdb-series-discover",
-                "name": "发现剧集",
-                "extra": series_extra,
-                "behaviorHints": {"paginated": True}
-            }
+            {"type": "movie", "id": "tmdb-movies-discover", "name": "发现电影", "extra": movie_extra, "behaviorHints": {"paginated": True}},
+            {"type": "series", "id": "tmdb-series-discover", "name": "发现剧集", "extra": series_extra, "behaviorHints": {"paginated": True}}
         ]
     }
 
@@ -79,39 +44,45 @@ def _to_stremio_meta_preview(item, media_type):
     将 TMDB API 返回的条目转换为 Stremio 的 meta 预览格式。
     """
     return {
-        "id": f"tmdb:{item.get('id')}",
-        "type": media_type,
+        "id": f"tmdb:{item.get('id')}", "type": media_type,
         "name": item.get('title') if media_type == 'movie' else item.get('name'),
         "poster": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,
     }
 
 def get_catalog(media_type, catalog_id, extra_args=None):
     """
-    处理 Stremio 的 catalog 请求, 支持分页和年份筛选。
+    处理 Stremio 的 catalog 请求, 统一处理排序和筛选逻辑。
     """
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
     extra_args = extra_args or {}
 
-    # 解析分页参数
     skip = int(extra_args.get("skip", 0))
     page = (skip // 20) + 1
 
-    # 首页热门目录的特殊处理
-    if 'popular' in catalog_id and not any(k in extra_args for k in ['genre', 'sort', 'year']):
-        items = get_popular(tmdb_type, page) # 假设 get_popular 也支持分页
-    # 发现页逻辑
-    else:
-        genre_name = extra_args.get("genre")
+    # 默认排序方式
+    sort_by = "热门程度"
+
+    # 如果请求来自发现页, 排序方式由用户选择
+    if "discover" in catalog_id:
         sort_by = extra_args.get("sort", "热门程度")
-        year = extra_args.get("year")
-        genre_id = None
-        if genre_name:
-            genre_list = GENRE_CACHE.get(f"{media_type}_genres", [])
-            for genre in genre_list:
-                if genre['name'] == genre_name:
-                    genre_id = genre['id']
-                    break
-        items = discover_media(tmdb_type, genre_id, sort_by, year, page)
+    # 如果请求来自首页, 排序方式由 catalog_id 决定
+    else:
+        sort_key = catalog_id.split("-")[-1]
+        sort_map = {"popular": "热门程度", "rating": "评分", "latest": "发行日期"}
+        if sort_key in sort_map:
+            sort_by = sort_map[sort_key]
+
+    genre_name = extra_args.get("genre")
+    year = extra_args.get("year")
+    genre_id = None
+    if genre_name:
+        genre_list = GENRE_CACHE.get(f"{media_type}_genres", [])
+        for genre in genre_list:
+            if genre['name'] == genre_name:
+                genre_id = genre['id']
+                break
+
+    items = discover_media(tmdb_type, genre_id, sort_by, year, page)
 
     metas = [_to_stremio_meta_preview(item, media_type) for item in items]
     return JSONResponse(content={"metas": metas})
