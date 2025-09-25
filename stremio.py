@@ -119,7 +119,7 @@ def _to_stremio_videos(episodes, series_id):
     return videos
 
 def _to_stremio_meta(request, item, media_type):
-    base_url = f"{request.url.scheme}://{request.url.netloc}"
+    base_url = f"https://{request.url.netloc}"
     transport_url = f"{base_url}/manifest.json"
 
     genres = item.get('genres', [])
