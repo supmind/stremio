@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from stremio import get_manifest, get_catalog, get_meta
 from typing import Optional
@@ -46,8 +46,8 @@ async def read_catalog_with_extras(media_type: str, catalog_id: str, extra_props
     return get_catalog(media_type, catalog_id, extra_args)
 
 @app.get("/meta/{media_type}/{tmdb_id}.json")
-async def read_meta(media_type: str, tmdb_id: str):
+async def read_meta(request: Request, media_type: str, tmdb_id: str):
     """
     提供特定内容的元数据。
     """
-    return get_meta(media_type, tmdb_id)
+    return get_meta(request, media_type, tmdb_id)

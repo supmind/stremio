@@ -3,6 +3,7 @@ from tmdb import get_meta as tmdb_get_meta, get_season_episodes, get_genres, dis
 from config import PLUGIN_ID, PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DESCRIPTION
 import asyncio
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 # 缓存和常量
 GENRE_CACHE = {}
@@ -91,7 +92,7 @@ def get_catalog(media_type, catalog_id, extra_args=None):
         sort_by_map = {"热门": "popular", "评分": "top_rated", "发行日期": "release_date"}
         sort_by = sort_by_map.get(extra_args.get("排序"), "popular")
 
-    genre_name = extra_args.get("类型")
+    genre_name = extra_args.get("genre")
     year = extra_args.get("年份")
     genre_id = None
     if genre_name:
@@ -117,7 +118,19 @@ def _to_stremio_videos(episodes, series_id):
         })
     return videos
 
-def _to_stremio_meta(item, media_type):
+def _to_stremio_meta(request, item, media_type):
+    base_url = f"{request.url.scheme}://{request.url.netloc}"
+    transport_url = f"{base_url}/manifest.json"
+
+    genres = item.get('genres', [])
+    genre_links = [
+        {
+            "name": genre['name'],
+            "category": "Discover by Genre",
+            "url": f"stremio:///discover/{quote(transport_url)}/{media_type}/tmdb-discover-all?genre={quote(genre['name'])}"
+        } for genre in genres
+    ]
+
     meta = {
         "id": f"tmdb:{item.get('id')}",
         "type": media_type,
@@ -127,7 +140,8 @@ def _to_stremio_meta(item, media_type):
         "description": item.get('overview'),
         "releaseInfo": format_to_iso(item.get('release_date') if media_type == 'movie' else item.get('first_air_date')),
         "imdbRating": item.get('vote_average'),
-        "genres": [genre['name'] for genre in item.get('genres', [])],
+        "genres": [genre['name'] for genre in genres],
+        "links": genre_links,
         "videos": [],  # Crucial: Add 'videos' array for all types
         "behaviorHints": {
             "defaultVideoId": None,
@@ -136,14 +150,14 @@ def _to_stremio_meta(item, media_type):
     }
     return meta
 
-def get_meta(media_type, tmdb_id_str):
+def get_meta(request, media_type, tmdb_id_str):
     tmdb_id = tmdb_id_str.replace("tmdb:", "")
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
     meta_info = tmdb_get_meta(tmdb_type, tmdb_id)
     if not meta_info:
         return JSONResponse(content={"meta": {}})
 
-    stremio_meta = _to_stremio_meta(meta_info, media_type)
+    stremio_meta = _to_stremio_meta(request, meta_info, media_type)
 
     if media_type == 'series':
         all_episodes = []
