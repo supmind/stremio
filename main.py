@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from stremio import get_manifest, get_catalog, get_meta
+from typing import Optional
 
 app = FastAPI()
 
@@ -11,20 +12,21 @@ def root():
 async def read_manifest():
     return await get_manifest()
 
-@app.get("/catalog/{media_type}/{catalog_id}.json")
-async def read_catalog_root(media_type: str, catalog_id: str):
+@app.get("/catalog/{media_type}/{catalog_id}/{extra_props:path}.json")
+async def read_catalog(media_type: str, catalog_id: str, extra_props: Optional[str] = None):
     """
-    处理不带额外参数的 catalog 请求。
+    处理所有 catalog 请求, 包括带或不带额外参数的情况。
+    - extra_props: 可选路径参数, 格式为 "key1=value1&key2=value2"
     """
-    return get_catalog(media_type, catalog_id)
+    extra_args = {}
+    if extra_props:
+        # FastAPI 会自动解码 URL, 但我们需要手动解析参数
+        try:
+            extra_args = dict(prop.split("=") for prop in extra_props.split("&"))
+        except ValueError:
+            # 如果解析失败, 忽略 extra_props
+            pass
 
-@app.get("/catalog/{media_type}/{catalog_id}/{extra_props}.json")
-async def read_catalog_with_extras(media_type: str, catalog_id: str, extra_props: str):
-    """
-    处理带有额外参数 (类型筛选、排序) 的 catalog 请求。
-    extra_props 的格式为 "key1=value1&key2=value2.json"
-    """
-    extra_args = dict(prop.split("=") for prop in extra_props.split("&"))
     return get_catalog(media_type, catalog_id, extra_args)
 
 @app.get("/meta/{media_type}/{tmdb_id}.json")

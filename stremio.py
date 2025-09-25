@@ -10,7 +10,8 @@ SORT_OPTIONS = ["热门程度", "发行日期", "评分"]
 async def get_manifest():
     """
     提供插件的 manifest.json。
-    该函数现在是异步的,因为它需要从 TMDB 获取类型列表。
+    - 首页(catalogs): 只显示热门电影和剧集。
+    - 发现页(filterCatalogs): 提供丰富的筛选和排序功能。
     """
     if "movie_genres" not in GENRE_CACHE:
         GENRE_CACHE["movie_genres"] = get_genres("movie")
@@ -31,20 +32,32 @@ async def get_manifest():
         "catalogs": [
             {
                 "type": "movie",
-                "id": "tmdb-discover-movies",
+                "id": "tmdb-movies-popular",
+                "name": "热门电影"
+            },
+            {
+                "type": "series",
+                "id": "tmdb-series-popular",
+                "name": "热门剧集"
+            }
+        ],
+        "filterCatalogs": [
+            {
+                "type": "movie",
+                "id": "tmdb-movies-discover",
                 "name": "发现电影",
                 "extra": [
-                    {"name": "genre", "options": movie_genres, "isRequired": False},
-                    {"name": "sort", "options": SORT_OPTIONS, "isRequired": False}
+                    {"name": "genre", "options": movie_genres},
+                    {"name": "sort", "options": SORT_OPTIONS}
                 ]
             },
             {
                 "type": "series",
-                "id": "tmdb-discover-series",
+                "id": "tmdb-series-discover",
                 "name": "发现剧集",
                 "extra": [
-                    {"name": "genre", "options": series_genres, "isRequired": False},
-                    {"name": "sort", "options": SORT_OPTIONS, "isRequired": False}
+                    {"name": "genre", "options": series_genres},
+                    {"name": "sort", "options": SORT_OPTIONS}
                 ]
             }
         ]
@@ -63,21 +76,27 @@ def _to_stremio_meta_preview(item, media_type):
 
 def get_catalog(media_type, catalog_id, extra_args=None):
     """
-    处理 Stremio 的 catalog 请求, 支持按类型和排序筛选。
+    处理 Stremio 的 catalog 请求。
+    根据 catalog_id 区分首页和发现页的逻辑。
     """
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
-    genre_name = extra_args.get("genre") if extra_args else None
-    sort_by = extra_args.get("sort") if extra_args else "热门程度"
 
-    genre_id = None
-    if genre_name:
-        genre_list = GENRE_CACHE.get(f"{'series' if tmdb_type == 'tv' else 'movie'}_genres", [])
-        for genre in genre_list:
-            if genre['name'] == genre_name:
-                genre_id = genre['id']
-                break
-
-    items = discover_media(tmdb_type, genre_id, sort_by)
+    # 修正后的逻辑:
+    # 如果是首页的热门目录请求 (ID 包含 popular 且没有额外参数)
+    if 'popular' in catalog_id and not extra_args:
+        items = get_popular(tmdb_type)
+    # 否则, 视为发现页的请求
+    else:
+        genre_name = extra_args.get("genre") if extra_args else None
+        sort_by = extra_args.get("sort", "热门程度")
+        genre_id = None
+        if genre_name:
+            genre_list = GENRE_CACHE.get(f"{media_type}_genres", [])
+            for genre in genre_list:
+                if genre['name'] == genre_name:
+                    genre_id = genre['id']
+                    break
+        items = discover_media(tmdb_type, genre_id, sort_by)
 
     metas = [_to_stremio_meta_preview(item, media_type) for item in items]
     return JSONResponse(content={"metas": metas})
