@@ -51,16 +51,16 @@ def get_genres(media_type="movie"):
         print(f"请求 TMDB 类型列表时发生错误: {e}")
         return []
 
-def discover_media(media_type="movie", genre_id=None, sort_by="popular", year=None, page=1):
+def discover_media(media_type="movie", genre_id=None, sort_by=None, year=None, page=1):
     """
     根据多种条件发现影视内容, 支持分页, 排除成人内容。
     """
     sort_map = {
-        "popular": "popularity.desc",
-        "release_date": "primary_release_date.desc",
-        "top_rated": "vote_average.desc",
+        "热门": "popularity.desc",
+        "发行日期": "primary_release_date.desc",
+        "评分": "vote_average.desc",
     }
-    sort_param = sort_map.get(sort_by, "popularity.desc")
+    sort_param = sort_map.get(sort_by, "热门")
 
     params = {
         'language': 'zh-CN',
