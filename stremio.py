@@ -25,37 +25,43 @@ async def get_manifest():
     movie_genres = [genre['name'] for genre in GENRE_CACHE["movie_genres"]]
     series_genres = [genre['name'] for genre in GENRE_CACHE["series_genres"]]
 
+    # 为可发现目录（可过滤）添加 'skip'
     movie_extra_discover = [
         {"name": "排序", "options": ["热门", "评分", "发行日期"], "isRequired": False},
         {"name": "类型", "options": movie_genres, "isRequired": False},
-        {"name": "年份", "options": YEARS, "isRequired": False}
+        {"name": "年份", "options": YEARS, "isRequired": False},
+        {"name": "skip"} # 添加 skip
     ]
     series_extra_discover = [
         {"name": "排序", "options": ["热门", "评分", "发行日期"], "isRequired": False},
         {"name": "类型", "options": series_genres, "isRequired": False},
-        {"name": "年份", "options": YEARS, "isRequired": False}
+        {"name": "年份", "options": YEARS, "isRequired": False},
+        {"name": "skip"} # 添加 skip
     ]
 
-    # 新的主页目录
+    # 定义基础分页行为
+    paginated_behavior = {"behaviorHints": {"paginated": True}}
+
+    # 新的主页目录 (支持分页)
     home_catalogs = [
-        {"type": "movie", "id": "tmdb-popular", "name": "热门电影"},
-        {"type": "movie", "id": "tmdb-top-rated", "name": "高分电影"},
-        {"type": "series", "id": "tmdb-popular", "name": "热门剧集"},
-        {"type": "series", "id": "tmdb-top-rated", "name": "高分剧集"}
+        {"type": "movie", "id": "tmdb-popular", "name": "热门电影", **paginated_behavior, "extra": [{"name": "skip"}]},
+        {"type": "movie", "id": "tmdb-top-rated", "name": "高分电影", **paginated_behavior, "extra": [{"name": "skip"}]},
+        {"type": "series", "id": "tmdb-popular", "name": "热门剧集", **paginated_behavior, "extra": [{"name": "skip"}]},
+        {"type": "series", "id": "tmdb-top-rated", "name": "高分剧集", **paginated_behavior, "extra": [{"name": "skip"}]}
     ]
 
-    # 新的发现页面目录
+    # 新的发现页面目录 (支持分页)
     discover_catalogs = [
-        {"type": "movie", "id": "tmdb-discover-popular", "name": "电影 - 热门"},
-        {"type": "movie", "id": "tmdb-discover-top-rated", "name": "电影 - 评分"},
-        {"type": "movie", "id": "tmdb-discover-all", "name": "电影 - 全部", "extra": movie_extra_discover},
-        {"type": "series", "id": "tmdb-discover-popular", "name": "剧集 - 热门"},
-        {"type": "series", "id": "tmdb-discover-top-rated", "name": "剧集 - 评分"},
-        {"type": "series", "id": "tmdb-discover-all", "name": "剧集 - 全部", "extra": series_extra_discover}
+        {"type": "movie", "id": "tmdb-discover-popular", "name": "电影 - 热门", **paginated_behavior, "extra": [{"name": "skip"}]},
+        {"type": "movie", "id": "tmdb-discover-top-rated", "name": "电影 - 评分", **paginated_behavior, "extra": [{"name": "skip"}]},
+        {"type": "movie", "id": "tmdb-discover-all", "name": "电影 - 全部", **paginated_behavior, "extra": movie_extra_discover},
+        {"type": "series", "id": "tmdb-discover-popular", "name": "剧集 - 热门", **paginated_behavior, "extra": [{"name": "skip"}]},
+        {"type": "series", "id": "tmdb-discover-top-rated", "name": "剧集 - 评分", **paginated_behavior, "extra": [{"name": "skip"}]},
+        {"type": "series", "id": "tmdb-discover-all", "name": "剧集 - 全部", **paginated_behavior, "extra": series_extra_discover}
     ]
 
     return {
-        "id": PLUGIN_ID, "version": "1.0.8", "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
+        "id": PLUGIN_ID, "version": "1.0.9", "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
         "resources": ["catalog", "meta"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
         "catalogs": home_catalogs + discover_catalogs
     }
