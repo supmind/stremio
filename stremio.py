@@ -92,7 +92,7 @@ def get_catalog(media_type, catalog_id, extra_args=None):
         sort_by_map = {"热门": "popular", "评分": "top_rated", "发行日期": "release_date"}
         sort_by = sort_by_map.get(extra_args.get("排序"), "popular")
 
-    genre_name = extra_args.get("类型")
+    genre_name = extra_args.get("genre")
     year = extra_args.get("年份")
     genre_id = None
     if genre_name:
@@ -123,8 +123,8 @@ def _to_stremio_meta(item, media_type):
     genre_links = [
         {
             "name": genre['name'],
-            "category": "按类型发现",
-            "url": f"stremio:///discover/{media_type}/tmdb-discover-all?类型={quote(genre['name'])}"
+            "category": "Discover by Genre",
+            "url": f"stremio:///discover/{media_type}/tmdb-discover-all?genre={quote(genre['name'])}"
         } for genre in genres
     ]
 
