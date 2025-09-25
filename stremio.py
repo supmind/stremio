@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 # 缓存和常量
 GENRE_CACHE = {}
-SORT_OPTIONS = ["热门", "发行日期", "评分"]
+SORT_OPTIONS = ["热门", "评分", "发行日期"] # 将热门放在第一位作为默认
 YEARS = [str(year) for year in range(datetime.now().year, 1979, -1)]
 
 def format_to_iso(date_str):
@@ -21,7 +21,7 @@ def format_to_iso(date_str):
 async def get_manifest():
     """
     提供插件的 manifest.json。
-    实验: 移除"热门电影"的 extra 属性, 只保留分页, 以测试兼容性。
+    修复方案: 简化 catalog ID, 将排序移至 extra 参数。
     """
     if "movie_genres" not in GENRE_CACHE: GENRE_CACHE["movie_genres"] = get_genres("movie")
     if "series_genres" not in GENRE_CACHE: GENRE_CACHE["series_genres"] = get_genres("tv")
@@ -29,24 +29,27 @@ async def get_manifest():
     movie_genres = [genre['name'] for genre in GENRE_CACHE["movie_genres"]]
     series_genres = [genre['name'] for genre in GENRE_CACHE["series_genres"]]
 
-    movie_extra = [{"name": "类型", "options": movie_genres}, {"name": "排序", "options": SORT_OPTIONS}, {"name": "年份", "options": YEARS}]
-    series_extra = [{"name": "类型", "options": series_genres}, {"name": "排序", "options": SORT_OPTIONS}, {"name": "年份", "options": YEARS}]
-
-    home_catalogs = [
-        # 实验: "热门电影"目录不带 extra
-        {"type": "movie", "id": "tmdb-movies-popular", "name": "热门电影 (测试)", "behaviorHints": {"paginated": True}},
-        {"type": "movie", "id": "tmdb-movies-rating", "name": "高分电影", "extra": movie_extra, "behaviorHints": {"paginated": True}},
-        {"type": "movie", "id": "tmdb-movies-latest", "name": "最新电影", "extra": movie_extra, "behaviorHints": {"paginated": True}},
-        {"type": "series", "id": "tmdb-series-popular", "name": "热门剧集", "extra": series_extra, "behaviorHints": {"paginated": True}},
-        {"type": "series", "id": "tmdb-series-rating", "name": "高分剧集", "extra": series_extra, "behaviorHints": {"paginated": True}},
-        {"type": "series", "id": "tmdb-series-latest", "name": "最新剧集", "extra": series_extra, "behaviorHints": {"paginated": True}},
+    # Stremio 在extra中需要一个 name, isRequired, 和 options
+    movie_extra = [
+        {"name": "排序", "options": SORT_OPTIONS, "isRequired": True},
+        {"name": "类型", "options": movie_genres, "isRequired": False},
+        {"name": "年份", "options": YEARS, "isRequired": False}
+    ]
+    series_extra = [
+        {"name": "排序", "options": SORT_OPTIONS, "isRequired": True},
+        {"name": "类型", "options": series_genres, "isRequired": False},
+        {"name": "年份", "options": YEARS, "isRequired": False}
     ]
 
     return {
-        "id": PLUGIN_ID, "version": "1.0.2", # 提升版本号以强制刷新
+        "id": PLUGIN_ID, "version": "1.0.3", # 提升版本号
         "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
         "resources": ["catalog", "meta"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
-        "catalogs": home_catalogs,
+        "catalogs": [
+            # 简化ID, 将所有筛选和排序逻辑都交给 extra
+            {"type": "movie", "id": "tmdb-discover", "name": "电影", "extra": movie_extra, "behaviorHints": {"paginated": True}},
+            {"type": "series", "id": "tmdb-discover", "name": "剧集", "extra": series_extra, "behaviorHints": {"paginated": True}}
+        ]
     }
 
 def _to_stremio_meta_preview(item, media_type):
@@ -62,10 +65,8 @@ def get_catalog(media_type, catalog_id, extra_args=None):
     skip = int(extra_args.get("skip", 0))
     page = (skip // 20) + 1
 
-    sort_key = catalog_id.split("-")[-1]
-    sort_map = {"popular": "热门", "rating": "评分", "latest": "发行日期"}
-    sort_by = extra_args.get("排序", sort_map.get(sort_key, "热门"))
-
+    # 逻辑简化: 排序方式总是从 extra_args 获取, 默认为"热门"
+    sort_by = extra_args.get("排序", "热门")
     genre_name = extra_args.get("类型")
     year = extra_args.get("年份")
     genre_id = None
