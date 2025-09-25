@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 # 加载 .env 文件中的环境变量
 load_dotenv()
 
-# 从环境变量中获取 TMDB API 密钥
-TMDB_API_KEY = os.getenv("TMDB_API_KEY", "your_tmdb_api_key_here")
+# 从环境变量中获取 TMDB API 读访问令牌
+TMDB_ACCESS_TOKEN = os.getenv("TMDB_ACCESS_TOKEN")
 
 # Stremio 插件配置
 PLUGIN_ID = "com.example.stremio-tmdb-plugin"

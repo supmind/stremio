@@ -15,14 +15,14 @@
 
 ### 2. 配置环境变量
 
-在项目根目录创建一个 `.env` 文件, 并填入你的 TMDB API 密钥。
+在项目根目录创建一个 `.env` 文件, 并填入你的 TMDB API 读访问令牌。
 
 ```
 # .env
-TMDB_API_KEY="your_tmdb_api_key_here"
+TMDB_ACCESS_TOKEN="your_tmdb_bearer_token_here"
 ```
 
-你可以从 [TMDB 网站](https://www.themoviedb.org/settings/api) 申请一个免费的 API 密钥。
+你可以从 [TMDB 网站](https://www.themoviedb.org/settings/api) 的“API 读访问令牌”部分获取。
 
 ### 3. 安装依赖
 
