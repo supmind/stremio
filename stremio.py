@@ -21,7 +21,7 @@ def format_to_iso(date_str):
 async def get_manifest():
     """
     提供插件的 manifest.json。
-    - 首页包含6个目录, 每个目录都支持筛选、排序和分页。
+    - 将 "genre" 标签本地化为 "类型"。
     """
     if "movie_genres" not in GENRE_CACHE: GENRE_CACHE["movie_genres"] = get_genres("movie")
     if "series_genres" not in GENRE_CACHE: GENRE_CACHE["series_genres"] = get_genres("tv")
@@ -29,8 +29,8 @@ async def get_manifest():
     movie_genres = [genre['name'] for genre in GENRE_CACHE["movie_genres"]]
     series_genres = [genre['name'] for genre in GENRE_CACHE["series_genres"]]
 
-    movie_extra = [{"name": "genre", "options": movie_genres}, {"name": "sort", "options": SORT_OPTIONS}, {"name": "year", "options": YEARS}]
-    series_extra = [{"name": "genre", "options": series_genres}, {"name": "sort", "options": SORT_OPTIONS}, {"name": "year", "options": YEARS}]
+    movie_extra = [{"name": "类型", "options": movie_genres}, {"name": "排序", "options": SORT_OPTIONS}, {"name": "年份", "options": YEARS}]
+    series_extra = [{"name": "类型", "options": series_genres}, {"name": "排序", "options": SORT_OPTIONS}, {"name": "年份", "options": YEARS}]
 
     home_catalogs = []
     base_home_sorts = [
@@ -47,7 +47,6 @@ async def get_manifest():
         "id": PLUGIN_ID, "version": PLUGIN_VERSION, "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
         "resources": ["catalog", "meta"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
         "catalogs": home_catalogs,
-        # 移除 filterCatalogs
     }
 
 def _to_stremio_meta_preview(item, media_type):
@@ -63,14 +62,12 @@ def get_catalog(media_type, catalog_id, extra_args=None):
     skip = int(extra_args.get("skip", 0))
     page = (skip // 20) + 1
 
-    # 从 catalog_id 中解析出默认排序方式
     sort_key = catalog_id.split("-")[-1]
     sort_map = {"popular": "热门", "rating": "评分", "latest": "发行日期"}
-    # 用户在"查看全部"页面选择的排序方式, 会覆盖默认值
-    sort_by = extra_args.get("sort", sort_map.get(sort_key, "热门"))
+    sort_by = extra_args.get("排序", sort_map.get(sort_key, "热门"))
 
-    genre_name = extra_args.get("genre")
-    year = extra_args.get("year")
+    genre_name = extra_args.get("类型")
+    year = extra_args.get("年份")
     genre_id = None
     if genre_name:
         genre_list = GENRE_CACHE.get(f"{media_type}_genres", [])
