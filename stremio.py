@@ -42,28 +42,25 @@ async def get_manifest():
     # 定义基础分页行为
     paginated_behavior = {"behaviorHints": {"paginated": True}}
 
-    # 新的主页目录 (支持分页)
-    home_catalogs = [
+    # 定义基础分页行为
+    paginated_behavior = {"behaviorHints": {"paginated": True}}
+
+    # 简化后的目录结构
+    catalogs = [
+        # 电影
         {"type": "movie", "id": "tmdb-popular", "name": "热门电影", **paginated_behavior, "extra": [{"name": "skip"}]},
         {"type": "movie", "id": "tmdb-top-rated", "name": "高分电影", **paginated_behavior, "extra": [{"name": "skip"}]},
+        {"type": "movie", "id": "tmdb-discover-all", "name": "全部电影", **paginated_behavior, "extra": movie_extra_discover},
+        # 剧集
         {"type": "series", "id": "tmdb-popular", "name": "热门剧集", **paginated_behavior, "extra": [{"name": "skip"}]},
-        {"type": "series", "id": "tmdb-top-rated", "name": "高分剧集", **paginated_behavior, "extra": [{"name": "skip"}]}
-    ]
-
-    # 新的发现页面目录 (支持分页)
-    discover_catalogs = [
-        {"type": "movie", "id": "tmdb-discover-popular", "name": "电影 - 热门", **paginated_behavior, "extra": [{"name": "skip"}]},
-        {"type": "movie", "id": "tmdb-discover-top-rated", "name": "电影 - 评分", **paginated_behavior, "extra": [{"name": "skip"}]},
-        {"type": "movie", "id": "tmdb-discover-all", "name": "电影 - 全部", **paginated_behavior, "extra": movie_extra_discover},
-        {"type": "series", "id": "tmdb-discover-popular", "name": "剧集 - 热门", **paginated_behavior, "extra": [{"name": "skip"}]},
-        {"type": "series", "id": "tmdb-discover-top-rated", "name": "剧集 - 评分", **paginated_behavior, "extra": [{"name": "skip"}]},
-        {"type": "series", "id": "tmdb-discover-all", "name": "剧集 - 全部", **paginated_behavior, "extra": series_extra_discover}
+        {"type": "series", "id": "tmdb-top-rated", "name": "高分剧集", **paginated_behavior, "extra": [{"name": "skip"}]},
+        {"type": "series", "id": "tmdb-discover-all", "name": "全部剧集", **paginated_behavior, "extra": series_extra_discover}
     ]
 
     return {
-        "id": PLUGIN_ID, "version": "1.0.9", "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
+        "id": PLUGIN_ID, "version": "1.1.0", "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
         "resources": ["catalog", "meta"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
-        "catalogs": home_catalogs + discover_catalogs
+        "catalogs": catalogs
     }
 
 def _to_stremio_meta_preview(item, media_type):
