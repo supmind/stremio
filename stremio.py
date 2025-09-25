@@ -6,7 +6,7 @@ from datetime import datetime
 
 # 缓存和常量
 GENRE_CACHE = {}
-SORT_OPTIONS = ["热门程度", "发行日期", "评分"]
+SORT_OPTIONS = ["热门", "发行日期", "评分"]
 YEARS = [str(year) for year in range(datetime.now().year, 1979, -1)]
 
 async def get_manifest():
@@ -60,15 +60,15 @@ def get_catalog(media_type, catalog_id, extra_args=None):
     page = (skip // 20) + 1
 
     # 默认排序方式
-    sort_by = "热门程度"
+    sort_by = "热门"
 
     # 如果请求来自发现页, 排序方式由用户选择
     if "discover" in catalog_id:
-        sort_by = extra_args.get("sort", "热门程度")
+        sort_by = extra_args.get("sort", "热门")
     # 如果请求来自首页, 排序方式由 catalog_id 决定
     else:
         sort_key = catalog_id.split("-")[-1]
-        sort_map = {"popular": "热门程度", "rating": "评分", "latest": "发行日期"}
+        sort_map = {"popular": "热门", "rating": "评分", "latest": "发行日期"}
         if sort_key in sort_map:
             sort_by = sort_map[sort_key]
 

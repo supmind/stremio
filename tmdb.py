@@ -55,7 +55,7 @@ def discover_media(media_type="movie", genre_id=None, sort_by=None, year=None, p
     根据多种条件发现影视内容, 支持分页, 排除成人内容。
     """
     sort_map = {
-        "热门程度": "popularity.desc",
+        "热门": "popularity.desc",
         "发行日期": "primary_release_date.desc",
         "评分": "vote_average.desc",
     }
