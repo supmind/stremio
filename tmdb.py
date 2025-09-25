@@ -4,18 +4,19 @@ from config import TMDB_API_KEY
 # TMDB API 的基础 URL
 BASE_URL = "https://api.themoviedb.org/3"
 
-def get_popular(media_type="movie"):
+def get_popular(media_type="movie", page=1):
     """
-    从 TMDB API 获取热门电影或剧集。
+    从 TMDB API 获取热门电影或剧集, 支持分页。
 
     :param media_type: 媒体类型, 'movie' 或 'tv' (对应剧集)
+    :param page: 页码
     :return: 包含热门内容的列表, 如果出错则返回空列表
     """
     if media_type not in ["movie", "tv"]:
         return []
 
     # 构建 API 请求 URL
-    url = f"{BASE_URL}/{media_type}/popular?api_key={TMDB_API_KEY}&language=zh-CN"
+    url = f"{BASE_URL}/{media_type}/popular?api_key={TMDB_API_KEY}&language=zh-CN&page={page}"
 
     try:
         response = requests.get(url)
@@ -82,12 +83,14 @@ def get_genres(media_type="movie"):
         print(f"请求 TMDB 类型列表时发生错误: {e}")
         return []
 
-def discover_media(media_type="movie", genre_id=None, sort_by=None):
+def discover_media(media_type="movie", genre_id=None, sort_by=None, year=None, page=1):
     """
-    根据类型和排序发现影视内容。
+    根据多种条件发现影视内容, 支持分页。
     :param media_type: 'movie' 或 'tv'
     :param genre_id: 类型的 ID
     :param sort_by: 排序方式
+    :param year: 年份
+    :param page: 页码
     :return: 包含内容的列表
     """
     sort_map = {
@@ -97,9 +100,15 @@ def discover_media(media_type="movie", genre_id=None, sort_by=None):
     }
     sort_param = sort_map.get(sort_by, "popularity.desc")
 
-    url = f"{BASE_URL}/discover/{media_type}?api_key={TMDB_API_KEY}&language=zh-CN&sort_by={sort_param}"
+    url = f"{BASE_URL}/discover/{media_type}?api_key={TMDB_API_KEY}&language=zh-CN&sort_by={sort_param}&page={page}"
     if genre_id:
         url += f"&with_genres={genre_id}"
+
+    if year:
+        if media_type == 'movie':
+            url += f"&primary_release_year={year}"
+        else: # tv
+            url += f"&first_air_date_year={year}"
 
     # TMDB API 要求, 按评分排序时, 投票数必须达到一个阈值才有意义
     if sort_param == "vote_average.desc":
