@@ -3,7 +3,6 @@ from tmdb import get_meta as tmdb_get_meta, get_season_episodes, get_genres, dis
 from config import PLUGIN_ID, PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DESCRIPTION
 import asyncio
 from datetime import datetime, timezone
-from urllib.parse import quote
 
 # 缓存和常量
 GENRE_CACHE = {}
@@ -92,7 +91,7 @@ def get_catalog(media_type, catalog_id, extra_args=None):
         sort_by_map = {"热门": "popular", "评分": "top_rated", "发行日期": "release_date"}
         sort_by = sort_by_map.get(extra_args.get("排序"), "popular")
 
-    genre_name = extra_args.get("genre")
+    genre_name = extra_args.get("类型")
     year = extra_args.get("年份")
     genre_id = None
     if genre_name:
@@ -119,15 +118,6 @@ def _to_stremio_videos(episodes, series_id):
     return videos
 
 def _to_stremio_meta(item, media_type):
-    genres = item.get('genres', [])
-    genre_links = [
-        {
-            "name": genre['name'],
-            "category": "Discover by Genre",
-            "url": f"stremio:///discover/{media_type}/tmdb-discover-all?genre={quote(genre['name'])}"
-        } for genre in genres
-    ]
-
     meta = {
         "id": f"tmdb:{item.get('id')}",
         "type": media_type,
@@ -137,8 +127,7 @@ def _to_stremio_meta(item, media_type):
         "description": item.get('overview'),
         "releaseInfo": format_to_iso(item.get('release_date') if media_type == 'movie' else item.get('first_air_date')),
         "imdbRating": item.get('vote_average'),
-        "genres": [genre['name'] for genre in genres],
-        "links": genre_links,
+        "genres": [genre['name'] for genre in item.get('genres', [])],
         "videos": [],  # Crucial: Add 'videos' array for all types
         "behaviorHints": {
             "defaultVideoId": None,
