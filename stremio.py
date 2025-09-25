@@ -1,33 +1,51 @@
 from fastapi.responses import JSONResponse
-from tmdb import get_popular as tmdb_get_popular, get_meta as tmdb_get_meta, get_season_episodes
+from tmdb import get_popular, get_meta, get_season_episodes, get_genres, discover_media
 from config import PLUGIN_ID, PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DESCRIPTION
+import asyncio
 
-def get_manifest():
+# 缓存类型列表以避免重复请求
+GENRE_CACHE = {}
+SORT_OPTIONS = ["热门程度", "发行日期", "评分"]
+
+async def get_manifest():
     """
     提供插件的 manifest.json。
-    这是 Stremio 识别插件的入口点。
+    该函数现在是异步的,因为它需要从 TMDB 获取类型列表。
     """
+    if "movie_genres" not in GENRE_CACHE:
+        GENRE_CACHE["movie_genres"] = get_genres("movie")
+    if "series_genres" not in GENRE_CACHE:
+        GENRE_CACHE["series_genres"] = get_genres("tv")
+
+    movie_genres = [genre['name'] for genre in GENRE_CACHE["movie_genres"]]
+    series_genres = [genre['name'] for genre in GENRE_CACHE["series_genres"]]
+
     return {
         "id": PLUGIN_ID,
         "version": PLUGIN_VERSION,
         "name": PLUGIN_NAME,
         "description": PLUGIN_DESCRIPTION,
-        "resources": [
-            "catalog",
-            "meta",
-        ],
+        "resources": ["catalog", "meta"],
         "types": ["movie", "series"],
         "idPrefixes": ["tmdb:"],
         "catalogs": [
             {
                 "type": "movie",
-                "id": "tmdb-popular-movies",
-                "name": "热门电影"
+                "id": "tmdb-discover-movies",
+                "name": "发现电影",
+                "extra": [
+                    {"name": "genre", "options": movie_genres, "isRequired": False},
+                    {"name": "sort", "options": SORT_OPTIONS, "isRequired": False}
+                ]
             },
             {
                 "type": "series",
-                "id": "tmdb-popular-series",
-                "name": "热门剧集"
+                "id": "tmdb-discover-series",
+                "name": "发现剧集",
+                "extra": [
+                    {"name": "genre", "options": series_genres, "isRequired": False},
+                    {"name": "sort", "options": SORT_OPTIONS, "isRequired": False}
+                ]
             }
         ]
     }
@@ -43,16 +61,25 @@ def _to_stremio_meta_preview(item, media_type):
         "poster": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,
     }
 
-def get_catalog(media_type, catalog_id):
+def get_catalog(media_type, catalog_id, extra_args=None):
     """
-    处理 Stremio 的 catalog 请求。
+    处理 Stremio 的 catalog 请求, 支持按类型和排序筛选。
     """
-    if catalog_id not in ["tmdb-popular-movies", "tmdb-popular-series"]:
-        return JSONResponse(content={"metas": []})
-
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
-    popular_items = tmdb_get_popular(tmdb_type)
-    metas = [_to_stremio_meta_preview(item, media_type) for item in popular_items]
+    genre_name = extra_args.get("genre") if extra_args else None
+    sort_by = extra_args.get("sort") if extra_args else "热门程度"
+
+    genre_id = None
+    if genre_name:
+        genre_list = GENRE_CACHE.get(f"{'series' if tmdb_type == 'tv' else 'movie'}_genres", [])
+        for genre in genre_list:
+            if genre['name'] == genre_name:
+                genre_id = genre['id']
+                break
+
+    items = discover_media(tmdb_type, genre_id, sort_by)
+
+    metas = [_to_stremio_meta_preview(item, media_type) for item in items]
     return JSONResponse(content={"metas": metas})
 
 def _to_stremio_videos(episodes, series_id):
@@ -98,16 +125,14 @@ def get_meta(media_type, tmdb_id_str):
     tmdb_id = tmdb_id_str.replace("tmdb:", "")
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
 
-    meta_info = tmdb_get_meta(tmdb_type, tmdb_id)
+    meta_info = get_meta(tmdb_type, tmdb_id)
     if not meta_info:
         return JSONResponse(content={"meta": {}})
 
     stremio_meta = _to_stremio_meta(meta_info, media_type)
 
-    # 如果是剧集, 则获取所有分集信息
     if media_type == 'series':
         all_episodes = []
-        # TMDB API 可能会有 "special" 季节, 季号为 0, 通常我们不显示
         seasons = [s for s in meta_info.get('seasons', []) if s.get('season_number') != 0]
         for season in seasons:
             episodes = get_season_episodes(tmdb_id, season.get('season_number'))

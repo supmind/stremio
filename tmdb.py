@@ -65,3 +65,51 @@ def get_season_episodes(tv_id, season_number):
     except requests.exceptions.RequestException as e:
         print(f"请求 TMDB 季度 {season_number} 信息时发生错误: {e}")
         return []
+
+def get_genres(media_type="movie"):
+    """
+    获取 TMDB 的类型列表。
+    :param media_type: 'movie' 或 'tv'
+    :return: 包含类型ID和名称的字典列表, 如 [{'id': 28, 'name': '动作'}]
+    """
+    url = f"{BASE_URL}/genre/{media_type}/list?api_key={TMDB_API_KEY}&language=zh-CN"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("genres", [])
+    except requests.exceptions.RequestException as e:
+        print(f"请求 TMDB 类型列表时发生错误: {e}")
+        return []
+
+def discover_media(media_type="movie", genre_id=None, sort_by=None):
+    """
+    根据类型和排序发现影视内容。
+    :param media_type: 'movie' 或 'tv'
+    :param genre_id: 类型的 ID
+    :param sort_by: 排序方式
+    :return: 包含内容的列表
+    """
+    sort_map = {
+        "热门程度": "popularity.desc",
+        "发行日期": "primary_release_date.desc",
+        "评分": "vote_average.desc",
+    }
+    sort_param = sort_map.get(sort_by, "popularity.desc")
+
+    url = f"{BASE_URL}/discover/{media_type}?api_key={TMDB_API_KEY}&language=zh-CN&sort_by={sort_param}"
+    if genre_id:
+        url += f"&with_genres={genre_id}"
+
+    # TMDB API 要求, 按评分排序时, 投票数必须达到一个阈值才有意义
+    if sort_param == "vote_average.desc":
+        url += "&vote_count.gte=100"
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("results", [])
+    except requests.exceptions.RequestException as e:
+        print(f"请求 TMDB discover API 时发生错误: {e}")
+        return []

@@ -9,27 +9,27 @@ def root():
 
 @app.get("/manifest.json")
 async def read_manifest():
-    """
-    Stremio 插件的 manifest.json
-    """
-    return get_manifest()
+    return await get_manifest()
 
 @app.get("/catalog/{media_type}/{catalog_id}.json")
-async def read_catalog(media_type: str, catalog_id: str):
+async def read_catalog_root(media_type: str, catalog_id: str):
     """
-    提供内容目录 (例如, 热门电影).
-    路径参数:
-    - media_type: 'movie' 或 'series'
-    - catalog_id: 在 manifest 中定义的 catalog id
+    处理不带额外参数的 catalog 请求。
     """
     return get_catalog(media_type, catalog_id)
+
+@app.get("/catalog/{media_type}/{catalog_id}/{extra_props}.json")
+async def read_catalog_with_extras(media_type: str, catalog_id: str, extra_props: str):
+    """
+    处理带有额外参数 (类型筛选、排序) 的 catalog 请求。
+    extra_props 的格式为 "key1=value1&key2=value2.json"
+    """
+    extra_args = dict(prop.split("=") for prop in extra_props.split("&"))
+    return get_catalog(media_type, catalog_id, extra_args)
 
 @app.get("/meta/{media_type}/{tmdb_id}.json")
 async def read_meta(media_type: str, tmdb_id: str):
     """
-    提供特定内容的元数据.
-    路径参数:
-    - media_type: 'movie' 或 'series'
-    - tmdb_id: Stremio 传递的 ID (例如 'tmdb:123')
+    提供特定内容的元数据。
     """
     return get_meta(media_type, tmdb_id)
