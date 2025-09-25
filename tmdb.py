@@ -73,7 +73,10 @@ def discover_media(media_type="movie", genre_id=None, sort_by=None, year=None, p
             url += f"&first_air_date_year={year}"
 
     if sort_param == "vote_average.desc":
-        url += "&vote_count.gte=100"
+        if media_type == 'movie':
+            url += "&vote_count.gte=300"
+        else: # tv
+            url += "&vote_count.gte=200"
 
     try:
         response = requests.get(url)
