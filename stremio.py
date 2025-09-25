@@ -29,13 +29,13 @@ async def get_manifest():
     # 为可发现目录（可过滤）添加 'skip'
     movie_extra_discover = [
         {"name": "排序", "options": ["热门", "评分", "发行日期"], "isRequired": False},
-        {"name": "genre", "options": movie_genres, "isRequired": False},
+        {"name": "类型", "options": movie_genres, "isRequired": False},
         {"name": "年份", "options": YEARS, "isRequired": False},
         {"name": "skip"} # 添加 skip
     ]
     series_extra_discover = [
         {"name": "排序", "options": ["热门", "评分", "发行日期"], "isRequired": False},
-        {"name": "genre", "options": series_genres, "isRequired": False},
+        {"name": "类型", "options": series_genres, "isRequired": False},
         {"name": "年份", "options": YEARS, "isRequired": False},
         {"name": "skip"} # 添加 skip
     ]
@@ -92,7 +92,7 @@ def get_catalog(media_type, catalog_id, extra_args=None):
         sort_by_map = {"热门": "popular", "评分": "top_rated", "发行日期": "release_date"}
         sort_by = sort_by_map.get(extra_args.get("排序"), "popular")
 
-    genre_name = extra_args.get("genre")
+    genre_name = extra_args.get("类型")
     year = extra_args.get("年份")
     genre_id = None
     if genre_name:
@@ -127,7 +127,7 @@ def _to_stremio_meta(request, item, media_type):
         {
             "name": genre['name'],
             "category": "Discover by Genre",
-            "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?genre={quote(genre['name'])}"
+            "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?类型={quote(genre['name'])}"
         } for genre in genres
     ]
 
