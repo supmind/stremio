@@ -61,10 +61,17 @@ async def get_manifest():
     }
 
 def _to_stremio_meta_preview(item, media_type):
+    release_date = item.get('release_date') if media_type == 'movie' else item.get('first_air_date')
+    year = release_date.split('-')[0] if release_date else None
+
     return {
-        "id": f"tmdb:{item.get('id')}", "type": media_type,
+        "id": f"tmdb:{item.get('id')}",
+        "type": media_type,
         "name": item.get('title') if media_type == 'movie' else item.get('name'),
         "poster": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,
+        "description": item.get('overview'),
+        "releaseInfo": year,
+        "imdbRating": item.get('vote_average'),
     }
 
 def get_catalog(media_type, catalog_id, extra_args=None):
