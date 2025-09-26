@@ -154,6 +154,7 @@ def _to_stremio_meta(request, item, credits, media_type):
     base_url = f"https://{request.url.netloc}"
     transport_url = f"{base_url}/manifest.json"
 
+    # Generate genre links
     genres = item.get('genres', [])
     genre_links = [
         {
@@ -163,15 +164,26 @@ def _to_stremio_meta(request, item, credits, media_type):
         } for genre in genres
     ]
 
-    # Extract director and cast
-    directors = []
-    cast = []
+    # Generate director and cast links
+    director_links = []
+    cast_links = []
     if credits:
         directors = [member['name'] for member in credits.get('crew', []) if member.get('job') == 'Director']
-        # For TV shows, 'created_by' are often considered directors/creators
         if not directors and media_type == 'series':
             directors = [creator['name'] for creator in item.get('created_by', [])]
-        cast = [member['name'] for member in credits.get('cast', [])[:10]] # Limit to top 10 actors
+
+        director_links = [{
+            "name": name,
+            "category": "director",
+            "url": f"stremio:///search?search={quote(name)}"
+        } for name in directors]
+
+        cast = [member['name'] for member in credits.get('cast', [])[:10]]
+        cast_links = [{
+            "name": name,
+            "category": "actor",
+            "url": f"stremio:///search?search={quote(name)}"
+        } for name in cast]
 
     # Correctly format releaseInfo and released
     release_info = ""
@@ -207,10 +219,9 @@ def _to_stremio_meta(request, item, credits, media_type):
         "releaseInfo": release_info,
         "released": released_date,
         "imdbRating": item.get('vote_average'),
-        "director": directors,
-        "cast": cast,
+        # "director" and "cast" are deprecated, use links instead.
         "genres": [genre['name'] for genre in genres],
-        "links": genre_links,
+        "links": genre_links + director_links + cast_links,
         "videos": [],  # Crucial: Add 'videos' array for all types
         "behaviorHints": {
             "defaultVideoId": None,
