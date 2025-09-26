@@ -219,15 +219,15 @@ def _to_stremio_meta(request, item, credits, media_type):
     }
     return meta
 
-def get_meta(request, media_type, tmdb_id_str):
+async def get_meta(request, media_type, tmdb_id_str):
     tmdb_id = tmdb_id_str.replace("tmdb:", "")
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
 
     # 并行获取元数据和演职员信息
-    meta_info, credits_info = asyncio.run(asyncio.gather(
+    meta_info, credits_info = await asyncio.gather(
         asyncio.to_thread(tmdb_get_meta, tmdb_type, tmdb_id),
         asyncio.to_thread(get_credits, tmdb_type, tmdb_id)
-    ))
+    )
 
     if not meta_info:
         return JSONResponse(content={"meta": {}})
@@ -235,10 +235,12 @@ def get_meta(request, media_type, tmdb_id_str):
     stremio_meta = _to_stremio_meta(request, meta_info, credits_info, media_type)
 
     if media_type == 'series':
+        # 在异步函数中，同步的 get_season_episodes 也应该在线程中运行以避免阻塞
         all_episodes = []
         seasons = [s for s in meta_info.get('seasons', []) if s.get('season_number') != 0]
-        for season in seasons:
-            episodes = get_season_episodes(tmdb_id, season.get('season_number'))
+        tasks = [asyncio.to_thread(get_season_episodes, tmdb_id, season.get('season_number')) for season in seasons]
+        season_results = await asyncio.gather(*tasks)
+        for episodes in season_results:
             all_episodes.extend(episodes)
         stremio_meta['videos'] = _to_stremio_videos(all_episodes, tmdb_id)
 

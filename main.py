@@ -50,4 +50,4 @@ async def read_meta(request: Request, media_type: str, tmdb_id: str):
     """
     提供特定内容的元数据。
     """
-    return get_meta(request, media_type, tmdb_id)
+    return await get_meta(request, media_type, tmdb_id)
