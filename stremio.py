@@ -62,6 +62,13 @@ async def get_manifest():
     ]
     catalogs.extend(search_catalogs)
 
+    # 为人物搜索添加专门的、隐藏的目录
+    person_catalogs = [
+        {"type": "movie", "id": "person-discover", "name": "Person Movie Search", "extra": [{"name": "search", "isRequired": True}]},
+        {"type": "series", "id": "person-discover", "name": "Person Series Search", "extra": [{"name": "search", "isRequired": True}]}
+    ]
+    catalogs.extend(person_catalogs)
+
     return {
         "id": PLUGIN_ID, "version": "1.1.0", "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
         "resources": ["catalog", "meta", "search"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
@@ -113,42 +120,40 @@ async def get_catalog(request, media_type, catalog_id, extra_args=None):
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
     extra_args = extra_args or {}
     page = int(extra_args.get("skip", 0)) // 20 + 1
-
-    # 处理搜索请求
     search_query = extra_args.get("search")
-    if search_query:
-        # 并行执行两种搜索: 按标题 和 按人物
-        title_search_task = asyncio.to_thread(search_media, search_query, page)
 
-        async def person_search_flow():
-            person_id = await asyncio.to_thread(search_person, search_query)
-            if person_id:
-                return await asyncio.to_thread(discover_by_person, person_id, tmdb_type, page)
-            return []
+    # 路由到不同的处理逻辑
+    # 专门处理人物搜索 (由演员/导演链接触发)
+    if catalog_id == 'person-discover':
+        if not search_query:
+            return JSONResponse(content={"metas": []})
 
-        person_search_task = person_search_flow()
+        person_id = await asyncio.to_thread(search_person, search_query)
+        if person_id:
+            all_results = await asyncio.to_thread(discover_by_person, person_id, tmdb_type, page)
+            # 再次确认媒体类型, 确保返回结果的正确性
+            items = [item for item in all_results if ('title' in item and tmdb_type == 'movie') or ('name' in item and tmdb_type == 'tv')]
+            metas = [_to_stremio_meta_preview(request, item, media_type) for item in items]
+            return JSONResponse(content={"metas": metas})
+        return JSONResponse(content={"metas": []})
 
-        title_results, person_results = await asyncio.gather(title_search_task, person_search_task)
+    # 专门处理标题搜索 (由 Stremio 搜索框触发)
+    if catalog_id == 'tmdb-search':
+        if not search_query:
+            return JSONResponse(content={"metas": []})
 
-        # 合并并去重
-        combined_results = {item['id']: item for item in person_results}
-        combined_results.update({item['id']: item for item in title_results})
-
-        # Stremio 会为每种类型发送单独的搜索请求, 我们需要过滤结果
-        items = [item for item in combined_results.values() if item.get('media_type') == tmdb_type]
-
+        search_results = await asyncio.to_thread(search_media, search_query, page)
+        items = [item for item in search_results if item.get('media_type') == tmdb_type]
         metas = [_to_stremio_meta_preview(request, item, media_type) for item in items]
         return JSONResponse(content={"metas": metas})
 
     # 处理普通的目录浏览请求
-    # 确定排序方式
     sort_by = "popular" # 默认
     if "top-rated" in catalog_id:
         sort_by = "top_rated"
     elif "popular" in catalog_id:
         sort_by = "popular"
 
-    # 对于 "全部" 目录，从 extra_args 获取排序
     if "all" in catalog_id:
         sort_by_map = {"热门": "popular", "评分": "top_rated", "发行日期": "release_date"}
         sort_by = sort_by_map.get(extra_args.get("排序"), "popular")
@@ -204,14 +209,14 @@ def _to_stremio_meta(request, item, credits, media_type):
         director_links = [{
             "name": name,
             "category": "director",
-            "url": f"stremio:///search?search={quote(name)}"
+            "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/person-discover?search={quote(name)}"
         } for name in directors]
 
         cast = [member['name'] for member in credits.get('cast', [])[:10]]
         cast_links = [{
             "name": name,
             "category": "actor",
-            "url": f"stremio:///search?search={quote(name)}"
+            "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/person-discover?search={quote(name)}"
         } for name in cast]
 
     # Correctly format releaseInfo and released

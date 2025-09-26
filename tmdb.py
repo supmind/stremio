@@ -146,7 +146,7 @@ def discover_by_person(person_id, media_type, page=1):
     根据人物 ID 发现其作品。
     """
     params = {
-        'with_cast': person_id,
+        'with_people': person_id,
         'language': 'zh-CN',
         'page': page,
         'sort_by': 'popularity.desc',
