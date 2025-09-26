@@ -24,15 +24,15 @@ async def read_manifest():
 
 # 新增: 处理不带 extra_props 的 catalog 请求
 @app.get("/catalog/{media_type}/{catalog_id}.json")
-async def read_catalog_simple(media_type: str, catalog_id: str):
+async def read_catalog_simple(request: Request, media_type: str, catalog_id: str):
     """
     处理不带 extra_props 的 catalog 请求, 例如主页上的热门和高分榜。
     """
-    return get_catalog(media_type, catalog_id)
+    return await get_catalog(request, media_type, catalog_id)
 
 # 修改: 处理带 extra_props 的 catalog 请求
 @app.get("/catalog/{media_type}/{catalog_id}/{extra_props:path}.json")
-async def read_catalog_with_extras(media_type: str, catalog_id: str, extra_props: Optional[str] = None):
+async def read_catalog_with_extras(request: Request, media_type: str, catalog_id: str, extra_props: Optional[str] = None):
     """
     处理所有带 extra_props 的 catalog 请求。
     extra_props 是一个可选路径参数, 格式为 "key=value&key2=value2"
@@ -43,7 +43,7 @@ async def read_catalog_with_extras(media_type: str, catalog_id: str, extra_props
             extra_args = dict(prop.split("=") for prop in extra_props.replace(".json", "").split("&"))
         except ValueError:
             pass
-    return get_catalog(media_type, catalog_id, extra_args)
+    return await get_catalog(request, media_type, catalog_id, extra_args)
 
 @app.get("/meta/{media_type}/{tmdb_id}.json")
 async def read_meta(request: Request, media_type: str, tmdb_id: str):

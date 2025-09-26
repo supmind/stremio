@@ -68,7 +68,7 @@ async def get_manifest():
         "catalogs": catalogs
     }
 
-def _to_stremio_meta_preview(item, media_type):
+def _to_stremio_meta_preview(request, item, media_type):
     # 搜索结果中的 media_type 可能与请求的 media_type 不同，需要从 item 中获取
     actual_media_type = item.get('media_type', media_type)
 
@@ -86,6 +86,17 @@ def _to_stremio_meta_preview(item, media_type):
     genre_cache_key = f"{'series' if actual_media_type == 'tv' else 'movie'}_genres"
     genres = [genre['name'] for genre in GENRE_CACHE.get(genre_cache_key, []) if genre['id'] in genre_ids]
 
+    # Generate genre links
+    base_url = f"https://{request.url.netloc}"
+    transport_url = f"{base_url}/manifest.json"
+    genre_links = [
+        {
+            "name": genre_name,
+            "category": "Genres",
+            "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?类型={quote(genre_name)}"
+        } for genre_name in genres
+    ]
+
     return {
         "id": f"tmdb:{item.get('id')}",
         "type": media_type,
@@ -94,10 +105,11 @@ def _to_stremio_meta_preview(item, media_type):
         "description": item.get('overview'),
         "releaseInfo": year,
         "imdbRating": item.get('vote_average'),
-        "genres": genres
+        "genres": genres,
+        "links": genre_links
     }
 
-def get_catalog(media_type, catalog_id, extra_args=None):
+async def get_catalog(request, media_type, catalog_id, extra_args=None):
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
     extra_args = extra_args or {}
     page = int(extra_args.get("skip", 0)) // 20 + 1
@@ -105,10 +117,10 @@ def get_catalog(media_type, catalog_id, extra_args=None):
     # 处理搜索请求
     search_query = extra_args.get("search")
     if search_query:
-        search_results = search_media(search_query, page)
+        search_results = await asyncio.to_thread(search_media, search_query, page)
         # Stremio 会为每种类型发送单独的搜索请求, 我们需要过滤结果
         items = [item for item in search_results if item.get('media_type') == tmdb_type]
-        metas = [_to_stremio_meta_preview(item, media_type) for item in items]
+        metas = [_to_stremio_meta_preview(request, item, media_type) for item in items]
         return JSONResponse(content={"metas": metas})
 
     # 处理普通的目录浏览请求
@@ -134,8 +146,8 @@ def get_catalog(media_type, catalog_id, extra_args=None):
                 genre_id = genre['id']
                 break
 
-    items = discover_media(tmdb_type, genre_id, sort_by, year, page)
-    metas = [_to_stremio_meta_preview(item, media_type) for item in items]
+    items = await asyncio.to_thread(discover_media, tmdb_type, genre_id, sort_by, year, page)
+    metas = [_to_stremio_meta_preview(request, item, media_type) for item in items]
     return JSONResponse(content={"metas": metas})
 
 def _to_stremio_videos(episodes, series_id):
