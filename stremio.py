@@ -131,6 +131,30 @@ def _to_stremio_meta(request, item, media_type):
         } for genre in genres
     ]
 
+    # Correctly format releaseInfo and released
+    release_info = ""
+    released_date = None
+    if media_type == 'movie':
+        release_date_str = item.get('release_date')
+        if release_date_str:
+            release_info = release_date_str.split('-')[0]
+        released_date = format_to_iso(release_date_str)
+    elif media_type == 'series':
+        start_date_str = item.get('first_air_date')
+        start_year = start_date_str.split('-')[0] if start_date_str else ''
+        released_date = format_to_iso(start_date_str)
+
+        status = item.get('status')
+        if status in ['Ended', 'Canceled']:
+            end_date_str = item.get('last_air_date')
+            end_year = end_date_str.split('-')[0] if end_date_str else ''
+            if start_year and end_year and start_year != end_year:
+                release_info = f"{start_year}-{end_year}"
+            else:
+                release_info = start_year
+        else: # 'Returning Series', 'In Production', etc.
+            release_info = f"{start_year}-" if start_year else ""
+
     meta = {
         "id": f"tmdb:{item.get('id')}",
         "type": media_type,
@@ -138,7 +162,8 @@ def _to_stremio_meta(request, item, media_type):
         "poster": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,
         "background": f"https://image.tmdb.org/t/p/original{item.get('backdrop_path')}" if item.get('backdrop_path') else None,
         "description": item.get('overview'),
-        "releaseInfo": format_to_iso(item.get('release_date') if media_type == 'movie' else item.get('first_air_date')),
+        "releaseInfo": release_info,
+        "released": released_date,
         "imdbRating": item.get('vote_average'),
         "genres": [genre['name'] for genre in genres],
         "links": genre_links,
