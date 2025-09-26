@@ -123,3 +123,41 @@ def get_credits(media_type, tmdb_id):
     except requests.exceptions.RequestException as e:
         print(f"请求 TMDB credits API 时发生错误: {e}")
         return None
+
+def search_person(query):
+    """
+    搜索人物并返回第一个结果的 ID。
+    """
+    params = {'query': query, 'language': 'zh-CN', 'include_adult': 'false'}
+    url = f"{BASE_URL}/search/person"
+    try:
+        response = requests.get(url, headers=HEADERS, params=params, proxies=PROXIES)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("results"):
+            return data["results"][0]["id"]
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"请求 TMDB person search API 时发生错误: {e}")
+        return None
+
+def discover_by_person(person_id, media_type, page=1):
+    """
+    根据人物 ID 发现其作品。
+    """
+    params = {
+        'with_cast': person_id,
+        'language': 'zh-CN',
+        'page': page,
+        'sort_by': 'popularity.desc',
+        'include_adult': 'false'
+    }
+    url = f"{BASE_URL}/discover/{media_type}"
+    try:
+        response = requests.get(url, headers=HEADERS, params=params, proxies=PROXIES)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("results", [])
+    except requests.exceptions.RequestException as e:
+        print(f"请求 TMDB discover by person API 时发生错误: {e}")
+        return []

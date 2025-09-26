@@ -1,5 +1,5 @@
 from fastapi.responses import JSONResponse
-from tmdb import get_meta as tmdb_get_meta, get_season_episodes, get_genres, discover_media, search_media, get_credits
+from tmdb import get_meta as tmdb_get_meta, get_season_episodes, get_genres, discover_media, search_media, get_credits, search_person, discover_by_person
 from config import PLUGIN_ID, PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DESCRIPTION
 import asyncio
 from datetime import datetime, timezone
@@ -117,9 +117,26 @@ async def get_catalog(request, media_type, catalog_id, extra_args=None):
     # 处理搜索请求
     search_query = extra_args.get("search")
     if search_query:
-        search_results = await asyncio.to_thread(search_media, search_query, page)
+        # 并行执行两种搜索: 按标题 和 按人物
+        title_search_task = asyncio.to_thread(search_media, search_query, page)
+
+        async def person_search_flow():
+            person_id = await asyncio.to_thread(search_person, search_query)
+            if person_id:
+                return await asyncio.to_thread(discover_by_person, person_id, tmdb_type, page)
+            return []
+
+        person_search_task = person_search_flow()
+
+        title_results, person_results = await asyncio.gather(title_search_task, person_search_task)
+
+        # 合并并去重
+        combined_results = {item['id']: item for item in person_results}
+        combined_results.update({item['id']: item for item in title_results})
+
         # Stremio 会为每种类型发送单独的搜索请求, 我们需要过滤结果
-        items = [item for item in search_results if item.get('media_type') == tmdb_type]
+        items = [item for item in combined_results.values() if item.get('media_type') == tmdb_type]
+
         metas = [_to_stremio_meta_preview(request, item, media_type) for item in items]
         return JSONResponse(content={"metas": metas})
 
