@@ -126,7 +126,7 @@ def _to_stremio_meta(request, item, media_type):
     genre_links = [
         {
             "name": genre['name'],
-            "category": "Discover by Genre",
+            "category": "Genres",
             "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?类型={quote(genre['name'])}"
         } for genre in genres
     ]
