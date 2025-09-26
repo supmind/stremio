@@ -87,3 +87,24 @@ def discover_media(media_type="movie", genre_id=None, sort_by="popular", year=No
     except requests.exceptions.RequestException as e:
         print(f"请求 TMDB discover API 时发生错误: {e}")
         return []
+
+def search_media(query, page=1):
+    """
+    使用 /search/multi 端点搜索电影和电视剧。
+    """
+    params = {
+        'query': query,
+        'language': 'zh-CN',
+        'page': page,
+        'include_adult': 'false'
+    }
+    url = f"{BASE_URL}/search/multi"
+    try:
+        response = requests.get(url, headers=HEADERS, params=params, proxies=PROXIES)
+        response.raise_for_status()
+        data = response.json()
+        # 过滤掉非电影和电视剧的结果 (例如: 人物)
+        return [item for item in data.get("results", []) if item.get('media_type') in ['movie', 'tv']]
+    except requests.exceptions.RequestException as e:
+        print(f"请求 TMDB search API 时发生错误: {e}")
+        return []

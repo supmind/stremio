@@ -1,5 +1,5 @@
 from fastapi.responses import JSONResponse
-from tmdb import get_meta as tmdb_get_meta, get_season_episodes, get_genres, discover_media
+from tmdb import get_meta as tmdb_get_meta, get_season_episodes, get_genres, discover_media, search_media
 from config import PLUGIN_ID, PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DESCRIPTION
 import asyncio
 from datetime import datetime, timezone
@@ -55,15 +55,31 @@ async def get_manifest():
         {"type": "series", "id": "tmdb-discover-all", "name": "全部剧集", **paginated_behavior, "extra": series_extra_discover}
     ]
 
+    # 为搜索添加专门的目录
+    search_catalogs = [
+        {"type": "movie", "id": "tmdb-search", "name": "电影搜索", "extra": [{"name": "search", "isRequired": True}]},
+        {"type": "series", "id": "tmdb-search", "name": "剧集搜索", "extra": [{"name": "search", "isRequired": True}]}
+    ]
+    catalogs.extend(search_catalogs)
+
     return {
         "id": PLUGIN_ID, "version": "1.1.0", "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
-        "resources": ["catalog", "meta"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
+        "resources": ["catalog", "meta", "search"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
         "catalogs": catalogs
     }
 
 def _to_stremio_meta_preview(item, media_type):
-    release_date = item.get('release_date') if media_type == 'movie' else item.get('first_air_date')
+    # 搜索结果中的 media_type 可能与请求的 media_type 不同，需要从 item 中获取
+    actual_media_type = item.get('media_type', media_type)
+
+    release_date_key = 'release_date' if actual_media_type == 'movie' else 'first_air_date'
+    release_date = item.get(release_date_key)
     year = release_date.split('-')[0] if release_date else None
+
+    # 有些搜索结果可能没有 'name' 或 'title'，提供备用
+    name = item.get('title') if actual_media_type == 'movie' else item.get('name')
+    if not name:
+        name = item.get('original_title') or item.get('original_name')
 
     return {
         "id": f"tmdb:{item.get('id')}",
@@ -80,6 +96,16 @@ def get_catalog(media_type, catalog_id, extra_args=None):
     extra_args = extra_args or {}
     page = int(extra_args.get("skip", 0)) // 20 + 1
 
+    # 处理搜索请求
+    search_query = extra_args.get("search")
+    if search_query:
+        search_results = search_media(search_query, page)
+        # Stremio 会为每种类型发送单独的搜索请求, 我们需要过滤结果
+        items = [item for item in search_results if item.get('media_type') == tmdb_type]
+        metas = [_to_stremio_meta_preview(item, media_type) for item in items]
+        return JSONResponse(content={"metas": metas})
+
+    # 处理普通的目录浏览请求
     # 确定排序方式
     sort_by = "popular" # 默认
     if "top-rated" in catalog_id:
