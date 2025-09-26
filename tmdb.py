@@ -108,3 +108,18 @@ def search_media(query, page=1):
     except requests.exceptions.RequestException as e:
         print(f"请求 TMDB search API 时发生错误: {e}")
         return []
+
+def get_credits(media_type, tmdb_id):
+    """
+    获取电影或剧集的演职员信息。
+    """
+    if media_type not in ["movie", "tv"]:
+        return None
+    url = f"{BASE_URL}/{media_type}/{tmdb_id}/credits?language=zh-CN"
+    try:
+        response = requests.get(url, headers=HEADERS, proxies=PROXIES)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"请求 TMDB credits API 时发生错误: {e}")
+        return None

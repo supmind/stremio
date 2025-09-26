@@ -1,5 +1,5 @@
 from fastapi.responses import JSONResponse
-from tmdb import get_meta as tmdb_get_meta, get_season_episodes, get_genres, discover_media, search_media
+from tmdb import get_meta as tmdb_get_meta, get_season_episodes, get_genres, discover_media, search_media, get_credits
 from config import PLUGIN_ID, PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DESCRIPTION
 import asyncio
 from datetime import datetime, timezone
@@ -81,14 +81,20 @@ def _to_stremio_meta_preview(item, media_type):
     if not name:
         name = item.get('original_title') or item.get('original_name')
 
+    # Map genre_ids to names
+    genre_ids = item.get('genre_ids', [])
+    genre_cache_key = f"{'series' if actual_media_type == 'tv' else 'movie'}_genres"
+    genres = [genre['name'] for genre in GENRE_CACHE.get(genre_cache_key, []) if genre['id'] in genre_ids]
+
     return {
         "id": f"tmdb:{item.get('id')}",
         "type": media_type,
-        "name": item.get('title') if media_type == 'movie' else item.get('name'),
+        "name": name,
         "poster": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,
         "description": item.get('overview'),
         "releaseInfo": year,
         "imdbRating": item.get('vote_average'),
+        "genres": genres
     }
 
 def get_catalog(media_type, catalog_id, extra_args=None):
@@ -144,7 +150,7 @@ def _to_stremio_videos(episodes, series_id):
         })
     return videos
 
-def _to_stremio_meta(request, item, media_type):
+def _to_stremio_meta(request, item, credits, media_type):
     base_url = f"https://{request.url.netloc}"
     transport_url = f"{base_url}/manifest.json"
 
@@ -156,6 +162,16 @@ def _to_stremio_meta(request, item, media_type):
             "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?类型={quote(genre['name'])}"
         } for genre in genres
     ]
+
+    # Extract director and cast
+    directors = []
+    cast = []
+    if credits:
+        directors = [member['name'] for member in credits.get('crew', []) if member.get('job') == 'Director']
+        # For TV shows, 'created_by' are often considered directors/creators
+        if not directors and media_type == 'series':
+            directors = [creator['name'] for creator in item.get('created_by', [])]
+        cast = [member['name'] for member in credits.get('cast', [])[:10]] # Limit to top 10 actors
 
     # Correctly format releaseInfo and released
     release_info = ""
@@ -191,6 +207,8 @@ def _to_stremio_meta(request, item, media_type):
         "releaseInfo": release_info,
         "released": released_date,
         "imdbRating": item.get('vote_average'),
+        "director": directors,
+        "cast": cast,
         "genres": [genre['name'] for genre in genres],
         "links": genre_links,
         "videos": [],  # Crucial: Add 'videos' array for all types
@@ -204,11 +222,17 @@ def _to_stremio_meta(request, item, media_type):
 def get_meta(request, media_type, tmdb_id_str):
     tmdb_id = tmdb_id_str.replace("tmdb:", "")
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
-    meta_info = tmdb_get_meta(tmdb_type, tmdb_id)
+
+    # 并行获取元数据和演职员信息
+    meta_info, credits_info = asyncio.run(asyncio.gather(
+        asyncio.to_thread(tmdb_get_meta, tmdb_type, tmdb_id),
+        asyncio.to_thread(get_credits, tmdb_type, tmdb_id)
+    ))
+
     if not meta_info:
         return JSONResponse(content={"meta": {}})
 
-    stremio_meta = _to_stremio_meta(request, meta_info, media_type)
+    stremio_meta = _to_stremio_meta(request, meta_info, credits_info, media_type)
 
     if media_type == 'series':
         all_episodes = []
