@@ -76,8 +76,8 @@ def _to_stremio_meta_preview(request, item, media_type):
     overview = item.get('overview')
 
     description_parts = []
-    if rating:
-        description_parts.append(f"⭐ {rating:.1f}/10")
+    # if rating:
+    #     description_parts.append(f"⭐ {rating:.1f}/10")
     if overview:
         description_parts.append(overview)
     formatted_description = "\n\n".join(description_parts)
@@ -161,7 +161,7 @@ def _to_stremio_meta(request, item, credits, media_type):
     rating = item.get('vote_average')
 
     links = []
-    if rating and imdb_id:
+    if rating:
         links.append({"name": f"{rating:.1f}", "category": "imdb", "url": f"https://imdb.com/title/{imdb_id}"})
 
     genre_names = [genre['name'] for genre in item.get('genres', [])]
