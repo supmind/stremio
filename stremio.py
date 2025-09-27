@@ -117,28 +117,21 @@ async def get_catalog(request, media_type, catalog_id, extra_args=None):
 
     # 当 Stremio 的全局搜索被触发时, 我们的 "tmdb-search" 目录会被调用
     if catalog_id == 'tmdb-search' and search_query:
-        # 并行执行两种搜索: 按标题 和 按人物
-        title_search_task = asyncio.to_thread(search_media, search_query, page)
+        # 优先进行人物搜索
+        person_id = await asyncio.to_thread(search_person, search_query)
 
-        async def person_search_flow():
-            person_id = await asyncio.to_thread(search_person, search_query)
-            if person_id:
-                # 注意: 这里我们同时获取电影和电视剧, 稍后过滤
-                movie_results = await asyncio.to_thread(discover_by_person, person_id, "movie", page)
-                series_results = await asyncio.to_thread(discover_by_person, person_id, "tv", page)
-                return movie_results + series_results
-            return []
-
-        person_search_task = person_search_flow()
-
-        title_results, person_results = await asyncio.gather(title_search_task, person_search_task)
-
-        # 合并并去重
-        combined_results = {item['id']: item for item in person_results}
-        combined_results.update({item['id']: item for item in title_results})
-
-        # Stremio 会为每种类型发送单独的搜索请求, 我们需要根据请求的类型过滤最终结果
-        items = [item for item in combined_results.values() if item.get('media_type') == tmdb_type]
+        items = []
+        if person_id:
+            # 如果找到人物, 就只返回该人物的作品
+            # 注意: Stremio 会为 movie 和 series 分别发送请求,
+            # 所以我们只需要根据当前请求的 tmdb_type 来获取对应类型的作品。
+            person_works = await asyncio.to_thread(discover_by_person, person_id, tmdb_type, page)
+            items.extend(person_works)
+        else:
+            # 如果没有找到人物, 则回退到按标题搜索
+            title_results = await asyncio.to_thread(search_media, search_query, page)
+            # 过滤结果以匹配请求的媒体类型
+            items.extend([item for item in title_results if item.get('media_type') == tmdb_type])
 
         metas = [_to_stremio_meta_preview(request, item, media_type) for item in items]
         return JSONResponse(content={"metas": metas})
