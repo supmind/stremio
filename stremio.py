@@ -148,6 +148,9 @@ async def get_catalog(request, media_type, catalog_id, extra_args=None):
             # 过滤结果以匹配请求的媒体类型
             items.extend([item for item in title_results if item.get('media_type') == tmdb_type])
 
+        # 按评分对最终结果进行排序
+        items.sort(key=lambda x: x.get('vote_average') or 0, reverse=True)
+
         metas = [_to_stremio_meta_preview(request, item, media_type) for item in items]
         return JSONResponse(content={"metas": metas})
 
