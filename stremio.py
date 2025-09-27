@@ -106,13 +106,24 @@ def _to_stremio_meta_preview(request, item, media_type):
     ]
 
     rating = item.get('vote_average')
+    overview = item.get('overview')
+
+    # For preview, we add the rating to the description as there's no other way
+    # to display it prominently in list/grid views.
+    description_parts = []
+    if rating:
+        description_parts.append(f"⭐ {rating:.1f}/10")
+    if overview:
+        description_parts.append(overview)
+    formatted_description = "\n".join(description_parts)
+
 
     return {
         "id": f"tmdb:{item.get('id')}",
         "type": media_type,
         "name": name,
         "poster": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,
-        "description": item.get('overview'),
+        "description": formatted_description,
         "releaseInfo": year,
         "imdbRating": rating,
         "genres": genres,
@@ -239,8 +250,12 @@ def _to_stremio_meta(request, item, credits, media_type):
         else:
             release_info = f"{start_year}-" if start_year else ""
 
+    # Prioritize IMDb ID for native Stremio UI, fallback to TMDB ID.
+    imdb_id = item.get('external_ids', {}).get('imdb_id')
+    stremio_id = imdb_id if imdb_id else f"tmdb:{item.get('id')}"
+
     meta = {
-        "id": f"tmdb:{item.get('id')}",
+        "id": stremio_id,
         "type": media_type,
         "name": item.get('title') if media_type == 'movie' else item.get('name'),
         "poster": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,

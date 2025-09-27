@@ -10,11 +10,11 @@ HEADERS = {
 
 def get_meta(media_type, tmdb_id):
     """
-    从 TMDB API 获取单个电影或剧集的详细元数据。
+    从 TMDB API 获取单个电影或剧集的详细元数据, 并附加外部ID(如IMDb ID)。
     """
     if media_type not in ["movie", "tv"]:
         return None
-    url = f"{BASE_URL}/{media_type}/{tmdb_id}?language=zh-CN"
+    url = f"{BASE_URL}/{media_type}/{tmdb_id}?language=zh-CN&append_to_response=external_ids"
     try:
         response = requests.get(url, headers=HEADERS, proxies=PROXIES)
         response.raise_for_status()
