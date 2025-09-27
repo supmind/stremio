@@ -115,29 +115,40 @@ async def get_catalog(request, media_type, catalog_id, extra_args=None):
     page = int(extra_args.get("skip", 0)) // 20 + 1
     search_query = extra_args.get("search")
 
+    print(f"--- DEBUG: Inside get_catalog ---")
+    print(f"  - Received media_type: {media_type} (Converted to tmdb_type: {tmdb_type})")
+    print(f"  - Received search_query: {search_query}")
+
     # 当 Stremio 的全局搜索被触发时, 我们的 "tmdb-search" 目录会被调用
     if catalog_id == 'tmdb-search' and search_query:
         items = []
         # 优先进行人物搜索
+        print(f"  - Searching for person with query: '{search_query}'")
         person_id = await asyncio.to_thread(search_person, search_query)
+        print(f"  - Found person_id: {person_id}")
 
         if person_id:
             # 如果找到人物, 尝试获取其作品
+            print(f"  - Discovering works for person_id: {person_id}, tmdb_type: {tmdb_type}")
             person_works = await asyncio.to_thread(discover_by_person, person_id, tmdb_type, page)
+            print(f"  - Found {len(person_works) if person_works else 0} works for the person.")
             if person_works:
                 # 如果作品列表不为空, 则使用这些结果
                 items.extend(person_works)
 
         # 如果人物搜索没有找到结果 (items 列表仍然为空),
         # 则回退到按标题搜索。
-        # 这处理了两种情况:
-        # 1. 未找到匹配的人物 (person_id is None)
-        # 2. 找到了人物, 但该人物在此媒体类型下没有作品 (person_works is empty)
         if not items:
+            print(f"  - Person search yielded no results. Falling back to title search for query: '{search_query}'")
             title_results = await asyncio.to_thread(search_media, search_query, page)
+            print(f"  - Title search found {len(title_results) if title_results else 0} raw results.")
             # 过滤结果以匹配请求的媒体类型
-            items.extend([item for item in title_results if item.get('media_type') == tmdb_type])
+            filtered_items = [item for item in title_results if item.get('media_type') == tmdb_type]
+            print(f"  - Filtered to {len(filtered_items)} results for tmdb_type: {tmdb_type}")
+            items.extend(filtered_items)
 
+        print(f"  - Total items to return: {len(items)}")
+        print("---------------------------------")
         metas = [_to_stremio_meta_preview(request, item, media_type) for item in items]
         return JSONResponse(content={"metas": metas})
 
