@@ -126,7 +126,7 @@ def get_credits(media_type, tmdb_id):
 
 def search_person(query):
     """
-    搜索人物并返回第一个结果的 ID。
+    搜索人物并返回人气最高的结果的 ID。
     """
     params = {'query': query, 'language': 'zh-CN', 'include_adult': 'false'}
     url = f"{BASE_URL}/search/person"
@@ -134,8 +134,11 @@ def search_person(query):
         response = requests.get(url, headers=HEADERS, params=params, proxies=PROXIES)
         response.raise_for_status()
         data = response.json()
-        if data.get("results"):
-            return data["results"][0]["id"]
+        results = data.get("results", [])
+        if results:
+            # 按人气排序并返回最受欢迎的人物的 ID
+            sorted_results = sorted(results, key=lambda x: x.get('popularity', 0), reverse=True)
+            return sorted_results[0]["id"]
         return None
     except requests.exceptions.RequestException as e:
         print(f"请求 TMDB person search API 时发生错误: {e}")
