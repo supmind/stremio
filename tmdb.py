@@ -146,7 +146,7 @@ def search_person(query):
 
 def get_person_combined_credits(person_id):
     """
-    获取一个人物参演的所有影视作品（电影和电视剧）。
+    获取一个人物参与的所有影视作品（作为演员或工作人员）。
     """
     params = {'language': 'zh-CN'}
     url = f"{BASE_URL}/person/{person_id}/combined_credits"
@@ -154,9 +154,25 @@ def get_person_combined_credits(person_id):
         response = requests.get(url, headers=HEADERS, params=params, proxies=PROXIES)
         response.raise_for_status()
         data = response.json()
-        # The 'cast' array from combined_credits includes both movies and tv shows,
-        # and importantly, each item has a 'media_type' field.
-        return data.get("cast", [])
+
+        # 使用字典按ID合并 cast 和 crew 列表以自动去重
+        all_works = {}
+
+        # 先添加 crew 成员的作品
+        crew_works = data.get("crew", [])
+        for work in crew_works:
+            if work.get('id'):
+                all_works[work['id']] = work
+
+        # 再添加 cast 成员的作品, 如果有重复的ID, 将会覆盖, 但内容基本相同
+        cast_works = data.get("cast", [])
+        for work in cast_works:
+            if work.get('id'):
+                all_works[work['id']] = work
+
+        # 返回去重后的作品列表
+        return list(all_works.values())
+
     except requests.exceptions.RequestException as e:
         print(f"请求 TMDB person combined_credits API 时发生错误: {e}")
         return []
