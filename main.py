@@ -35,14 +35,26 @@ async def read_catalog_simple(request: Request, media_type: str, catalog_id: str
 async def read_catalog_with_extras(request: Request, media_type: str, catalog_id: str, extra_props: Optional[str] = None):
     """
     处理所有带 extra_props 的 catalog 请求。
-    extra_props 是一个可选路径参数, 格式为 "key=value&key2=value2"
+    extra_props 可以是 "key=value&key2=value2" 格式,
+    对于搜索, 也可能是纯文本查询, 如 "The Queen's Gambit"。
     """
     extra_args = {}
     if extra_props:
-        try:
-            extra_args = dict(prop.split("=") for prop in extra_props.replace(".json", "").split("&"))
-        except ValueError:
-            pass
+        clean_props = extra_props.replace(".json", "")
+        # 检查是否为纯文本搜索查询 (不含 '=')
+        is_raw_search = catalog_id == 'tmdb-search' and '=' not in clean_props
+
+        if is_raw_search:
+            # 如果是纯文本, 直接作为搜索词
+            extra_args['search'] = clean_props
+        else:
+            # 否则, 按 key=value 对解析
+            try:
+                extra_args = dict(prop.split("=") for prop in clean_props.split("&"))
+            except ValueError:
+                # 忽略格式错误的参数
+                pass
+
     return await get_catalog(request, media_type, catalog_id, extra_args)
 
 @app.get("/meta/{media_type}/{tmdb_id}.json")
