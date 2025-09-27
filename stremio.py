@@ -106,22 +106,13 @@ def _to_stremio_meta_preview(request, item, media_type):
     ]
 
     rating = item.get('vote_average')
-    overview = item.get('overview')
-
-    description_parts = []
-    if rating:
-        description_parts.append(f"⭐ {rating:.1f}/10")
-    if overview:
-        description_parts.append(overview)
-
-    formatted_description = "\n".join(description_parts)
 
     return {
         "id": f"tmdb:{item.get('id')}",
         "type": media_type,
         "name": name,
         "poster": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,
-        "description": formatted_description,
+        "description": item.get('overview'),
         "releaseInfo": year,
         "imdbRating": rating,
         "genres": genres,
