@@ -86,8 +86,8 @@ def _to_stremio_meta_preview(request, item, media_type):
     base_url = f"https://{request.url.netloc}"
     transport_url = f"{base_url}/manifest.json"
     links = [
-        {"name": name, "category": "Genres", "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?类型={quote(name)}"}
-        for name in genre_names
+        {"name": genre_name, "category": "Genres", "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?类型={quote(genre_name)}"}
+        for genre_name in genre_names
     ]
 
     return {
@@ -98,7 +98,7 @@ def _to_stremio_meta_preview(request, item, media_type):
         "description": item.get('overview'),
         "releaseInfo": year,
         "imdbRating": f"{rating:.1f}" if rating else None,
-        "genres": genre_names,
+        "genres": genre_names, # Deprecated, but still used by some clients
         "links": links
     }
 
@@ -189,8 +189,8 @@ def _to_stremio_meta(request, item, credits, media_type):
     # --- Link Generation ---
     links = []
     rating = item.get('vote_average')
-    if rating:
-        links.append({"name": f"{rating:.1f}", "category": "imdb", "url": f"https://imdb.com/title/{imdb_id}" if imdb_id else ""})
+    if rating and imdb_id:
+        links.append({"name": f"{rating:.1f}", "category": "imdb", "url": f"https://imdb.com/title/{imdb_id}"})
 
     genre_names = [genre['name'] for genre in item.get('genres', [])]
     links.extend([{"name": name, "category": "Genres", "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?类型={quote(name)}"} for name in genre_names])
