@@ -1,5 +1,9 @@
 from fastapi.responses import JSONResponse
-from tmdb import get_meta as tmdb_get_meta, get_season_episodes, get_genres, discover_media, search_media, get_credits, search_person, discover_by_person
+from tmdb import (
+    get_meta as tmdb_get_meta, get_season_episodes, get_genres, discover_media,
+    search_media, get_credits, search_person,
+    get_person_combined_credits
+)
 from config import PLUGIN_ID, PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DESCRIPTION
 import asyncio
 from datetime import datetime, timezone
@@ -126,11 +130,13 @@ async def get_catalog(request, media_type, catalog_id, extra_args=None):
         person_id = await asyncio.to_thread(search_person, search_query)
 
         if person_id:
-            # 如果找到人物, 尝试获取其作品
-            person_works = await asyncio.to_thread(discover_by_person, person_id, tmdb_type, page)
-            if person_works:
-                # 如果作品列表不为空, 则使用这些结果
-                items.extend(person_works)
+            # 使用统一的接口获取所有作品
+            all_works = await asyncio.to_thread(get_person_combined_credits, person_id)
+            if all_works:
+                # 在本地根据请求的媒体类型进行过滤
+                person_works = [work for work in all_works if work.get('media_type') == tmdb_type]
+                if person_works:
+                    items.extend(person_works)
 
         # 如果人物搜索没有找到结果 (items 列表仍然为空),
         # 则回退到按标题搜索。

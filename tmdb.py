@@ -144,23 +144,19 @@ def search_person(query):
         print(f"请求 TMDB person search API 时发生错误: {e}")
         return None
 
-def discover_by_person(person_id, media_type, page=1):
+def get_person_combined_credits(person_id):
     """
-    根据人物 ID 发现其作品。
+    获取一个人物参演的所有影视作品（电影和电视剧）。
     """
-    params = {
-        'with_people': person_id,
-        'language': 'zh-CN',
-        'page': page,
-        'sort_by': 'popularity.desc',
-        'include_adult': 'false'
-    }
-    url = f"{BASE_URL}/discover/{media_type}"
+    params = {'language': 'zh-CN'}
+    url = f"{BASE_URL}/person/{person_id}/combined_credits"
     try:
         response = requests.get(url, headers=HEADERS, params=params, proxies=PROXIES)
         response.raise_for_status()
         data = response.json()
-        return data.get("results", [])
+        # The 'cast' array from combined_credits includes both movies and tv shows,
+        # and importantly, each item has a 'media_type' field.
+        return data.get("cast", [])
     except requests.exceptions.RequestException as e:
-        print(f"请求 TMDB discover by person API 时发生错误: {e}")
+        print(f"请求 TMDB person combined_credits API 时发生错误: {e}")
         return []
