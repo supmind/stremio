@@ -105,14 +105,25 @@ def _to_stremio_meta_preview(request, item, media_type):
         } for genre_name in genres
     ]
 
+    rating = item.get('vote_average')
+    overview = item.get('overview')
+
+    description_parts = []
+    if rating:
+        description_parts.append(f"⭐ {rating:.1f}/10")
+    if overview:
+        description_parts.append(overview)
+
+    formatted_description = "\n".join(description_parts)
+
     return {
         "id": f"tmdb:{item.get('id')}",
         "type": media_type,
         "name": name,
         "poster": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,
-        "description": item.get('overview'),
+        "description": formatted_description,
         "releaseInfo": year,
-        "imdbRating": item.get('vote_average'),
+        "imdbRating": rating,
         "genres": genres,
         "links": genre_links
     }
@@ -192,41 +203,32 @@ def _to_stremio_videos(episodes, series_id):
     return videos
 
 def _to_stremio_meta(request, item, credits, media_type):
+    # Note: The visual layout of the metadata (e.g., the order of genres, description, cast)
+    # is controlled by the Stremio client application, not by the addon.
+    # This function provides the data in separate, structured fields
+    # for the client to render as it sees fit.
     base_url = f"https://{request.url.netloc}"
     transport_url = f"{base_url}/manifest.json"
 
-    # Generate genre links
-    genres = item.get('genres', [])
+    # --- Data Extraction and Link Generation ---
+    genre_names = [genre['name'] for genre in item.get('genres', [])]
     genre_links = [
-        {
-            "name": genre['name'],
-            "category": "Genres",
-            "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?类型={quote(genre['name'])}"
-        } for genre in genres
+        {"name": name, "category": "Genres", "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?类型={quote(name)}"}
+        for name in genre_names
     ]
 
-    # Generate director and cast links
     director_links = []
     cast_links = []
     if credits:
         directors = [member['name'] for member in credits.get('crew', []) if member.get('job') == 'Director']
         if not directors and media_type == 'series':
             directors = [creator['name'] for creator in item.get('created_by', [])]
-
-        director_links = [{
-            "name": name,
-            "category": "director",
-            "url": f"stremio:///search?search={quote(name)}"
-        } for name in directors]
+        director_links = [{"name": name, "category": "director", "url": f"stremio:///search?search={quote(name)}"} for name in directors]
 
         cast = [member['name'] for member in credits.get('cast', [])[:10]]
-        cast_links = [{
-            "name": name,
-            "category": "actor",
-            "url": f"stremio:///search?search={quote(name)}"
-        } for name in cast]
+        cast_links = [{"name": name, "category": "actor", "url": f"stremio:///search?search={quote(name)}"} for name in cast]
 
-    # Correctly format releaseInfo and released
+    # --- Release Info Formatting ---
     release_info = ""
     released_date = None
     if media_type == 'movie':
@@ -238,16 +240,12 @@ def _to_stremio_meta(request, item, credits, media_type):
         start_date_str = item.get('first_air_date')
         start_year = start_date_str.split('-')[0] if start_date_str else ''
         released_date = format_to_iso(start_date_str)
-
         status = item.get('status')
         if status in ['Ended', 'Canceled']:
             end_date_str = item.get('last_air_date')
             end_year = end_date_str.split('-')[0] if end_date_str else ''
-            if start_year and end_year and start_year != end_year:
-                release_info = f"{start_year}-{end_year}"
-            else:
-                release_info = start_year
-        else: # 'Returning Series', 'In Production', etc.
+            release_info = f"{start_year}-{end_year}" if start_year and end_year and start_year != end_year else start_year
+        else:
             release_info = f"{start_year}-" if start_year else ""
 
     meta = {
@@ -256,18 +254,14 @@ def _to_stremio_meta(request, item, credits, media_type):
         "name": item.get('title') if media_type == 'movie' else item.get('name'),
         "poster": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,
         "background": f"https://image.tmdb.org/t/p/original{item.get('backdrop_path')}" if item.get('backdrop_path') else None,
-        "description": item.get('overview'),
+        "description": item.get('overview'),  # Correctly use the raw overview
         "releaseInfo": release_info,
         "released": released_date,
         "imdbRating": item.get('vote_average'),
-        # "director" and "cast" are deprecated, use links instead.
-        "genres": [genre['name'] for genre in genres],
-        "links": genre_links + director_links + cast_links,
-        "videos": [],  # Crucial: Add 'videos' array for all types
-        "behaviorHints": {
-            "defaultVideoId": None,
-            "hasScheduledVideos": media_type == 'series'
-        }
+        "genres": genre_names,  # Provide genres for Stremio's native display
+        "links": genre_links + director_links + cast_links, # Provide links for Stremio's native display
+        "videos": [],
+        "behaviorHints": {"defaultVideoId": None, "hasScheduledVideos": media_type == 'series'}
     }
     return meta
 
