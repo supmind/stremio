@@ -37,6 +37,11 @@ async def read_catalog_with_extras(request: Request, media_type: str, catalog_id
     处理所有带 extra_props 的 catalog 请求。
     对于搜索请求, 它会进行特殊的、更健壮的解析。
     """
+    print("\n--- DEBUG: New Catalog Request ---")
+    print(f"  - Incoming media_type: {media_type}")
+    print(f"  - Incoming catalog_id: {catalog_id}")
+    print(f"  - Incoming extra_props: {extra_props}")
+
     extra_args = {}
     if extra_props:
         clean_props = extra_props.replace(".json", "")
@@ -55,6 +60,9 @@ async def read_catalog_with_extras(request: Request, media_type: str, catalog_id
             except ValueError:
                 # 忽略格式错误的参数
                 pass
+
+    print(f"  - Final extra_args to be passed: {extra_args}")
+    print("---------------------------------\n")
 
     return await get_catalog(request, media_type, catalog_id, extra_args)
 
