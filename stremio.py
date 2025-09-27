@@ -144,7 +144,7 @@ async def get_catalog(request, media_type, catalog_id, extra_args=None):
 def _to_stremio_videos(episodes, series_id):
     videos = []
     for episode in episodes:
-        video_id = f"tmdb:{series_id}:{episode.get('season_number')}:{episode.get('episode_number')}"
+        video_id = f"{series_id}:{episode.get('season_number')}:{episode.get('episode_number')}"
         videos.append({
             "id": video_id, "title": episode.get('name'), "season": episode.get('season_number'),
             "episode": episode.get('episode_number'), "released": format_to_iso(episode.get('air_date')),
@@ -223,10 +223,10 @@ async def get_meta(request, media_type, tmdb_id_str):
     if media_type == 'series':
         all_episodes = []
         seasons = [s for s in meta_info.get('seasons', []) if s.get('season_number') != 0]
-        tasks = [asyncio.to_thread(get_season_episodes, tmdb_id, season.get('season_number')) for season in seasons]
+        tasks = [asyncio.to_thread(get_season_episodes, meta_info.get('id'), season.get('season_number')) for season in seasons]
         season_results = await asyncio.gather(*tasks)
         for episodes in season_results:
             all_episodes.extend(episodes)
-        stremio_meta['videos'] = _to_stremio_videos(all_episodes, tmdb_id)
+        stremio_meta['videos'] = _to_stremio_videos(all_episodes, stremio_meta['id'])
 
     return JSONResponse(content={"meta": stremio_meta})
