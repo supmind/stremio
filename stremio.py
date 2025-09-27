@@ -117,18 +117,23 @@ async def get_catalog(request, media_type, catalog_id, extra_args=None):
 
     # 当 Stremio 的全局搜索被触发时, 我们的 "tmdb-search" 目录会被调用
     if catalog_id == 'tmdb-search' and search_query:
+        items = []
         # 优先进行人物搜索
         person_id = await asyncio.to_thread(search_person, search_query)
 
-        items = []
         if person_id:
-            # 如果找到人物, 就只返回该人物的作品
-            # 注意: Stremio 会为 movie 和 series 分别发送请求,
-            # 所以我们只需要根据当前请求的 tmdb_type 来获取对应类型的作品。
+            # 如果找到人物, 尝试获取其作品
             person_works = await asyncio.to_thread(discover_by_person, person_id, tmdb_type, page)
-            items.extend(person_works)
-        else:
-            # 如果没有找到人物, 则回退到按标题搜索
+            if person_works:
+                # 如果作品列表不为空, 则使用这些结果
+                items.extend(person_works)
+
+        # 如果人物搜索没有找到结果 (items 列表仍然为空),
+        # 则回退到按标题搜索。
+        # 这处理了两种情况:
+        # 1. 未找到匹配的人物 (person_id is None)
+        # 2. 找到了人物, 但该人物在此媒体类型下没有作品 (person_works is empty)
+        if not items:
             title_results = await asyncio.to_thread(search_media, search_query, page)
             # 过滤结果以匹配请求的媒体类型
             items.extend([item for item in title_results if item.get('media_type') == tmdb_type])
