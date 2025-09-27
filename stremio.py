@@ -30,36 +30,30 @@ async def get_manifest():
     movie_genres = [genre['name'] for genre in GENRE_CACHE["movie_genres"]]
     series_genres = [genre['name'] for genre in GENRE_CACHE["series_genres"]]
 
-    # 为可发现目录（可过滤）添加 'skip'
     movie_extra_discover = [
         {"name": "排序", "options": ["热门", "评分", "发行日期"], "isRequired": False},
         {"name": "类型", "options": movie_genres, "isRequired": False},
         {"name": "年份", "options": YEARS, "isRequired": False},
-        {"name": "skip"} # 添加 skip
+        {"name": "skip"}
     ]
     series_extra_discover = [
         {"name": "排序", "options": ["热门", "评分", "发行日期"], "isRequired": False},
         {"name": "类型", "options": series_genres, "isRequired": False},
         {"name": "年份", "options": YEARS, "isRequired": False},
-        {"name": "skip"} # 添加 skip
+        {"name": "skip"}
     ]
 
-    # 定义基础分页行为
     paginated_behavior = {"behaviorHints": {"paginated": True}}
 
-    # 简化后的目录结构
     catalogs = [
-        # 电影
         {"type": "movie", "id": "tmdb-popular", "name": "热门电影", **paginated_behavior, "extra": [{"name": "skip"}]},
         {"type": "movie", "id": "tmdb-top-rated", "name": "高分电影", **paginated_behavior, "extra": [{"name": "skip"}]},
         {"type": "movie", "id": "tmdb-discover-all", "name": "全部电影", **paginated_behavior, "extra": movie_extra_discover},
-        # 剧集
         {"type": "series", "id": "tmdb-popular", "name": "热门剧集", **paginated_behavior, "extra": [{"name": "skip"}]},
         {"type": "series", "id": "tmdb-top-rated", "name": "高分剧集", **paginated_behavior, "extra": [{"name": "skip"}]},
         {"type": "series", "id": "tmdb-discover-all", "name": "全部剧集", **paginated_behavior, "extra": series_extra_discover}
     ]
 
-    # 为搜索添加专门的目录
     search_catalogs = [
         {"type": "movie", "id": "tmdb-search", "name": "电影搜索", "extra": [{"name": "search", "isRequired": True}]},
         {"type": "series", "id": "tmdb-search", "name": "剧集搜索", "extra": [{"name": "search", "isRequired": True}]}
@@ -68,38 +62,34 @@ async def get_manifest():
 
     return {
         "id": PLUGIN_ID, "version": "1.1.0", "name": PLUGIN_NAME, "description": PLUGIN_DESCRIPTION,
-        "resources": ["catalog", "meta", "search"], "types": ["movie", "series"], "idPrefixes": ["tmdb:"],
+        "resources": ["catalog", "meta", "search"], "types": ["movie", "series"], "idPrefixes": ["tmdb:", "tt"],
         "catalogs": catalogs
     }
 
 def _to_stremio_meta_preview(request, item, media_type):
-    # This function creates a 'Meta Preview' object, used for catalog lists.
-    # It follows the structure of the official cinemeta addon for maximum compatibility.
     tmdb_item_type = item.get('media_type', 'tv' if media_type == 'series' else 'movie')
     release_date_key = 'release_date' if tmdb_item_type == 'movie' else 'first_air_date'
     release_date = item.get(release_date_key)
     year = release_date.split('-')[0] if release_date else None
     name = item.get('title') if tmdb_item_type == 'movie' else item.get('name')
     rating = item.get('vote_average')
+    overview = item.get('overview')
 
-    genre_names = [genre['name'] for genre in GENRE_CACHE.get(f"{'series' if tmdb_item_type == 'tv' else 'movie'}_genres", []) if genre['id'] in item.get('genre_ids', [])]
-    base_url = f"https://{request.url.netloc}"
-    transport_url = f"{base_url}/manifest.json"
-    links = [
-        {"name": genre_name, "category": "Genres", "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?类型={quote(genre_name)}"}
-        for genre_name in genre_names
-    ]
+    description_parts = []
+    if rating:
+        description_parts.append(f"⭐ {rating:.1f}/10")
+    if overview:
+        description_parts.append(overview)
+    formatted_description = "\n\n".join(description_parts)
 
     return {
         "id": f"tmdb:{item.get('id')}",
         "type": media_type,
         "name": name,
         "poster": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,
-        "description": item.get('overview'),
+        "description": formatted_description,
         "releaseInfo": year,
         "imdbRating": f"{rating:.1f}" if rating else None,
-        "genres": genre_names, # Deprecated, but still used by some clients
-        "links": links
     }
 
 async def get_catalog(request, media_type, catalog_id, extra_args=None):
@@ -108,39 +98,26 @@ async def get_catalog(request, media_type, catalog_id, extra_args=None):
     page = int(extra_args.get("skip", 0)) // 20 + 1
     search_query = extra_args.get("search")
 
-    # 当 Stremio 的全局搜索被触发时, 我们的 "tmdb-search" 目录会被调用
     if catalog_id == 'tmdb-search' and search_query:
         items = []
-        # 优先进行人物搜索
         person_id = await asyncio.to_thread(search_person, search_query)
 
         if person_id:
-            # 使用统一的接口获取所有作品
             all_works = await asyncio.to_thread(get_person_combined_credits, person_id)
             if all_works:
-                # 在本地根据请求的媒体类型进行过滤
                 person_works = [work for work in all_works if work.get('media_type') == tmdb_type]
                 if person_works:
                     items.extend(person_works)
 
-        # 如果人物搜索没有找到结果 (items 列表仍然为空),
-        # 则回退到按标题搜索。
-        # 这处理了两种情况:
-        # 1. 未找到匹配的人物 (person_id is None)
-        # 2. 找到了人物, 但该人物在此媒体类型下没有作品 (person_works is empty)
         if not items:
             title_results = await asyncio.to_thread(search_media, search_query, page)
-            # 过滤结果以匹配请求的媒体类型
             items.extend([item for item in title_results if item.get('media_type') == tmdb_type])
 
-        # 按评分对最终结果进行排序
         items.sort(key=lambda x: x.get('vote_average') or 0, reverse=True)
-
         metas = [_to_stremio_meta_preview(request, item, media_type) for item in items]
         return JSONResponse(content={"metas": metas})
 
-    # 处理普通的目录浏览请求
-    sort_by = "popular" # 默认
+    sort_by = "popular"
     if "top-rated" in catalog_id:
         sort_by = "top_rated"
     elif "popular" in catalog_id:
@@ -177,18 +154,13 @@ def _to_stremio_videos(episodes, series_id):
     return videos
 
 def _to_stremio_meta(request, item, credits, media_type):
-    # This function creates a 'Meta' object, used for the detail page.
-    # It follows the structure of the official cinemeta addon for maximum compatibility.
     base_url = f"https://{request.url.netloc}"
     transport_url = f"{base_url}/manifest.json"
-
-    # --- ID Management ---
     imdb_id = item.get('external_ids', {}).get('imdb_id')
     stremio_id = imdb_id if imdb_id else f"tmdb:{item.get('id')}"
-
-    # --- Link Generation ---
-    links = []
     rating = item.get('vote_average')
+
+    links = []
     if rating and imdb_id:
         links.append({"name": f"{rating:.1f}", "category": "imdb", "url": f"https://imdb.com/title/{imdb_id}"})
 
@@ -204,7 +176,6 @@ def _to_stremio_meta(request, item, credits, media_type):
         cast = [member['name'] for member in credits.get('cast', [])[:10]]
         links.extend([{"name": name, "category": "Cast", "url": f"stremio:///search?search={quote(name)}"} for name in cast])
 
-    # --- Release Info Formatting ---
     release_info = ""
     if media_type == 'movie':
         release_date_str = item.get('release_date')
@@ -236,10 +207,9 @@ def _to_stremio_meta(request, item, credits, media_type):
     return meta
 
 async def get_meta(request, media_type, tmdb_id_str):
-    tmdb_id = tmdb_id_str.replace("tmdb:", "")
+    tmdb_id = tmdb_id_str.replace("tmdb:", "").replace("tt", "")
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
 
-    # 并行获取元数据和演职员信息
     meta_info, credits_info = await asyncio.gather(
         asyncio.to_thread(tmdb_get_meta, tmdb_type, tmdb_id),
         asyncio.to_thread(get_credits, tmdb_type, tmdb_id)
@@ -251,7 +221,6 @@ async def get_meta(request, media_type, tmdb_id_str):
     stremio_meta = _to_stremio_meta(request, meta_info, credits_info, media_type)
 
     if media_type == 'series':
-        # 在异步函数中，同步的 get_season_episodes 也应该在线程中运行以避免阻塞
         all_episodes = []
         seasons = [s for s in meta_info.get('seasons', []) if s.get('season_number') != 0]
         tasks = [asyncio.to_thread(get_season_episodes, tmdb_id, season.get('season_number')) for season in seasons]
