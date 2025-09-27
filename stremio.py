@@ -82,6 +82,14 @@ def _to_stremio_meta_preview(request, item, media_type):
     name = item.get('title') if tmdb_item_type == 'movie' else item.get('name')
     rating = item.get('vote_average')
 
+    genre_names = [genre['name'] for genre in GENRE_CACHE.get(f"{'series' if tmdb_item_type == 'tv' else 'movie'}_genres", []) if genre['id'] in item.get('genre_ids', [])]
+    base_url = f"https://{request.url.netloc}"
+    transport_url = f"{base_url}/manifest.json"
+    links = [
+        {"name": name, "category": "Genres", "url": f"stremio:///discover/{quote(transport_url, safe='')}/{media_type}/tmdb-discover-all?类型={quote(name)}"}
+        for name in genre_names
+    ]
+
     return {
         "id": f"tmdb:{item.get('id')}",
         "type": media_type,
@@ -90,8 +98,8 @@ def _to_stremio_meta_preview(request, item, media_type):
         "description": item.get('overview'),
         "releaseInfo": year,
         "imdbRating": f"{rating:.1f}" if rating else None,
-        # The 'genres' field is technically deprecated but still used by many clients.
-        "genres": [genre['name'] for genre in GENRE_CACHE.get(f"{'series' if tmdb_item_type == 'tv' else 'movie'}_genres", []) if genre['id'] in item.get('genre_ids', [])]
+        "genres": genre_names,
+        "links": links
     }
 
 async def get_catalog(request, media_type, catalog_id, extra_args=None):
