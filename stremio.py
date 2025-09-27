@@ -199,7 +199,7 @@ def _to_stremio_meta(request, item, credits, media_type):
         directors = [member['name'] for member in credits.get('crew', []) if member.get('job') == 'Director']
         if not directors and media_type == 'series':
             directors = [creator['name'] for creator in item.get('created_by', [])]
-        links.extend([{"name": name, "category": "Director", "url": f"stremio:///search?search={quote(name)}"} for name in directors])
+        links.extend([{"name": name, "category": "Directors", "url": f"stremio:///search?search={quote(name)}"} for name in directors])
 
         cast = [member['name'] for member in credits.get('cast', [])[:10]]
         links.extend([{"name": name, "category": "Cast", "url": f"stremio:///search?search={quote(name)}"} for name in cast])
