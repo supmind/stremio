@@ -11,9 +11,29 @@ HEADERS = {
 def get_meta(media_type, tmdb_id):
     """
     从 TMDB API 获取单个电影或剧集的详细元数据, 并附加外部ID(如IMDb ID)。
+    如果提供的是 IMDb ID, 会先查找对应的 TMDB ID。
     """
     if media_type not in ["movie", "tv"]:
         return None
+
+    # 如果是 IMDb ID, 先查找 TMDB ID
+    if str(tmdb_id).startswith("tt"):
+        find_url = f"{BASE_URL}/find/{tmdb_id}?external_source=imdb_id"
+        try:
+            response = requests.get(find_url, headers=HEADERS, proxies=PROXIES)
+            response.raise_for_status()
+            find_results = response.json()
+            # 根据 media_type 确定要查找的键
+            result_key = 'tv_results' if media_type == 'tv' else 'movie_results'
+            results = find_results.get(result_key, [])
+            if not results:
+                return None
+            tmdb_id = results[0]['id']  # 使用找到的第一个结果的ID
+        except requests.exceptions.RequestException as e:
+            print(f"通过 IMDb ID 查找时发生错误: {e}")
+            return None
+
+    # 使用 TMDB ID 获取详细信息
     url = f"{BASE_URL}/{media_type}/{tmdb_id}?language=zh-CN&append_to_response=external_ids"
     try:
         response = requests.get(url, headers=HEADERS, proxies=PROXIES)

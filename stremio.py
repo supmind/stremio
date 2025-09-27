@@ -207,7 +207,7 @@ def _to_stremio_meta(request, item, credits, media_type):
     return meta
 
 async def get_meta(request, media_type, tmdb_id_str):
-    tmdb_id = tmdb_id_str.replace("tmdb:", "").replace("tt", "")
+    tmdb_id = tmdb_id_str.replace("tmdb:", "")
     tmdb_type = 'tv' if media_type == 'series' else 'movie'
 
     meta_info, credits_info = await asyncio.gather(
